@@ -1,0 +1,103 @@
+defaults:
+  - ../default
+  - _self_
+user_profile:
+  name: 运动控制研究员
+  description: 专注于四足机器人和人形机器人的运动控制技术
+  research_area: locomotion_control
+
+search:
+  field: robotics
+  days: 14
+  max_results: 500
+  max_display: 10
+  min_score: 0.35
+
+interest_keywords:
+  # 🎯 核心概念（高权重）
+  - "# 🎯 核心概念 (高权重)"
+  - quadruped
+  - biped
+  - four-legged robot
+  - humanoid robot
+  - spot robot
+  - anymal
+  - unitree
+  - go1
+  - a1 robot
+  - mini cheetah
+  - hyq
+  - cassie robot
+  - atlas walking
+  - humanoid walking
+  - bipedal locomotion
+  - locomotion control
+  - whole body control
+  - coordinated locomotion
+  - dynamic stability
+  - balance control
+
+  # 🔧 扩展概念（中权重）
+  - "# 🔧 扩展概念 (中权重)"
+  - gait generation
+  - gait optimization
+  - gait planning
+  - trotting gait
+  - galloping gait
+  - bounding gait
+  - dynamic walking
+  - static stability
+  - postural control
+  - terrain adaptation
+  - rough terrain
+  - model predictive control
+  - linear quadratic regulator
+  - impedance control
+  - admittance control
+  - position control
+  - force control
+  - torque control
+
+  # 📝 相关概念（标准权重）
+  - "# 📝 相关概念 (标准权重)"
+  - legged locomotion
+  - quadruped locomotion
+  - quadruped control
+  - household robot
+  - service robot
+  - domestic robot
+  - robot locomotion experiments
+
+exclude_keywords:
+  # 排除非运动控制相关任务
+  - manipulation
+  - grasping
+  - pick and place
+  - arm control
+  - hand control
+  - finger control
+  - vision
+  - perception
+  - SLAM
+  - navigation
+  - path planning
+  - medical
+  - surgical
+  - rehabilitation
+  - therapy
+  - prosthetic
+  - wheelchair
+  - vehicle
+  - drone
+  - UAV
+  - underwater
+  - marine
+  - pure manipulation
+  - pure perception
+  - non-locomotion studies
+  - fixed base
+  - stationary
+  - social robot
+  - human-robot interaction
+
+description: 四足和人形机器人运动控制配置，专注于步态生成、平衡控制和地形适应 [精炼关键词结构，核心优先]

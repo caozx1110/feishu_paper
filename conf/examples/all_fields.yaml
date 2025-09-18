@@ -1,0 +1,78 @@
+# 全领域默认配置 - 获取所有领域的论文
+# @package _global_
+
+# 用户信息
+user_profile:
+  name: "全领域研究员"
+  description: "对所有学术领域都感兴趣，获取全面的论文信息"
+  research_area: "general"
+  focus_areas: ["ai", "robotics", "cv", "nlp", "ml", "cs"]
+
+# 搜索参数配置
+search_config:
+  field: "all" # 搜索所有领域
+  days: 7 # 搜索最近7天的论文
+  max_results: 50 # 更多结果以覆盖所有领域
+  max_display: 20 # 显示更多论文
+  min_score: 0.05 # 较低的评分阈值以包含更多论文
+
+# 关键词配置 - 使用通配符获取所有论文
+interest_keywords:
+  - "*" # 通配符匹配所有论文
+
+# 只排除明显无关的领域
+exclude_keywords:
+  - "pure mathematics"
+  - "theoretical physics"
+  - "chemistry"
+  - "biology"
+  - "astronomy"
+  - "geology"
+  - "linguistics"
+  - "psychology"
+  - "philosophy"
+  - "literature"
+  - "poetry"
+  - "music"
+  - "art"
+  - "history"
+  - "sociology"
+  - "economics"
+  - "political science"
+
+# 智能匹配配置 - 关闭以提高性能
+intelligent_matching_config:
+  enabled: false
+  score_weights:
+    base: 1.0
+    semantic: 0.2
+    author: 0.1
+    novelty: 0.3
+    citation: 0.2
+  fuzzy_threshold: 0.7
+  time_decay_days: 30
+
+# PDF下载配置
+download_config:
+  enabled: false # 默认不下载PDF（因为论文太多）
+  max_downloads: 5 # 限制下载数量
+  download_dir: "downloads/all_fields"
+  create_metadata: true
+  create_index: true
+  force_download: false
+
+# 显示配置
+display_config:
+  show_ranking: true
+  show_scores: true
+  show_breakdown: false
+  stats: true
+
+# 输出配置
+output_config:
+  save: true
+  save_keywords: false
+  include_scores: true
+  format: "markdown"
+
+description: "全领域默认配置 - 获取所有学术领域的最新论文"

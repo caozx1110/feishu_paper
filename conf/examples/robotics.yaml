@@ -1,0 +1,53 @@
+defaults:
+  - ../default
+  - _self_
+user_profile:
+  name: 机器人学研究员
+  description: 专注于机器人学研究，包括控制、感知、规划和学习
+  research_area: robotics
+search:
+  field: robotics
+  days: 10
+  max_results: 20
+  max_display: 15
+interest_keywords:
+  - "# 🎯 核心概念 (高权重)"
+  - robot
+  - robotics
+  - humanoid robot
+  - bipedal robot
+  - quadruped robot
+  - legged robot
+  - mobile robot
+  - service robot
+  - cobot
+  - drone
+  - ""
+  - "# 🔧 扩展概念 (中权重)"
+  - industrial robot
+  - collaborative robot
+  - autonomous vehicle
+  - underwater robot
+  - whole body control
+  - dexterous manipulation
+  - trajectory planning
+  - inverse kinematics
+  - forward kinematics
+  - inverse dynamics
+  - robot perception
+  - simultaneous localization and mapping
+  - obstacle avoidance
+  - semantic mapping
+  - place recognition
+  - ""
+exclude_keywords:
+  - pure software
+  - web development
+  - database
+  - network
+  - cybersecurity
+  - theoretical computer science
+  - algorithm complexity
+  - formal verification
+  - programming language
+description: 机器人学领域配置示例，涵盖控制、感知、规划、学习和人机交互 [已优化关键词结构]

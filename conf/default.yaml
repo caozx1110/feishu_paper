@@ -1,0 +1,73 @@
+# ArXiv 论文采集工具 - 默认配置
+# @package _global_
+
+# 搜索参数配置
+search:
+  field:
+    "all" # 搜索领域，支持以下格式：
+    # 单个: "ai", "robotics", "cv", "nlp"
+    # 并集: "ai+robotics", "ai|cv", "ai or nlp"
+    # 交集: "ai&robotics" (注意：ArXiv API限制，实际为并集)
+    # 直接分类: "cs.AI", ["cs.AI", "cs.LG"]
+    # 可用领域: all, ai, robotics, cv, nlp, physics, math, stat, eess, q-bio
+  days: 7 # 搜索天数
+  max_results: 30 # 最大获取结果数
+  max_display: 15 # 最大显示数量
+  min_score: 0.15 # 最小评分阈值
+
+# 关键词配置
+interest_keywords:
+  - "*" # 通配符，匹配所有论文
+
+exclude_keywords:
+  - "medical"
+  - "clinical"
+  - "healthcare"
+  - "pharmaceutical"
+  - "drug"
+  - "disease"
+  - "pure mathematics"
+  - "theoretical physics"
+
+# 智能匹配配置
+intelligent_matching:
+  enabled: false # 默认关闭智能匹配
+  score_weights:
+    base: 1.0 # 基础匹配权重
+    semantic: 0.3 # 语义增强权重
+    author: 0.2 # 作者分析权重
+    novelty: 0.4 # 新颖性权重
+    citation: 0.3 # 引用潜力权重
+  fuzzy_threshold: 0.8 # 模糊匹配阈值
+  time_decay_days: 30 # 时间衰减天数
+
+# PDF下载配置
+download:
+  enabled: false # 默认不下载PDF
+  max_downloads: 10 # 最大下载数量
+  download_dir: "downloads" # 下载目录
+  create_metadata: true # 创建元数据文件
+  create_index: true # 创建索引文件
+  force_download: false # 强制重新下载
+
+# 显示配置
+display:
+  show_ranking: true # 显示排序
+  show_scores: true # 显示评分
+  show_breakdown: false # 显示评分分解（仅智能匹配时有效）
+  stats: true # 显示统计信息
+
+# 输出配置
+output:
+  save: true # 保存报告
+  save_keywords: false # 保存关键词信息
+  include_scores: true # 包含评分信息
+  format: "markdown" # 输出格式: markdown, txt
+
+# 用户配置信息（可选）
+user_profile:
+  name: "通用研究员"
+  description: "通用配置，适用于各种研究领域"
+  research_area: "general"
+
+description: "ArXiv 论文采集工具默认配置"

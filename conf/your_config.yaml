@@ -1,0 +1,12 @@
+# @package _global_
+
+# 默认配置 - 使用 default.yaml 作为基础配置
+defaults:
+  - default
+  - _self_
+# 如果需要，可以在这里覆盖特定的参数
+# 例如：
+# search:
+#   days: 5  # 覆盖默认的7天
+# intelligent_matching:
+#   enabled: true  # 启用智能匹配

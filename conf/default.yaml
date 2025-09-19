@@ -71,7 +71,7 @@ display:
 
 # 输出配置
 output:
-  save: true # 保存报告
+  save: false # 保存报告
   save_keywords: false # 保存关键词信息
   include_scores: true # 包含评分信息
   format: "markdown" # 输出格式: markdown, txt
@@ -107,6 +107,7 @@ feishu:
     relations_node_token: ${oc.env:FEISHU_RELATIONS_NODE_TOKEN,""} # 关系节点token
 
   # 视图管理配置
+  # TODO:排序条件似乎无效
   views:
     enabled: true # 是否启用视图管理
     auto_cleanup: true # 是否自动清理多余视图
@@ -125,35 +126,21 @@ feishu:
           - field: "发布日期"
             direction: "desc"
 
-      - name: "研究领域分组"
-        type: "group_sort"
-        description: "按研究领域分组，评分排序"
-        group_by: "研究领域"
-        sorts:
-          - field: "相关性评分"
-            direction: "desc"
-
-      - name: "作者分组"
-        type: "group_sort"
-        description: "按作者分组，评分排序"
-        group_by: "作者"
-        sorts:
-          - field: "相关性评分"
-            direction: "desc"
-
-      - name: "分类整理"
-        type: "group_sort"
-        description: "按论文分类分组"
-        group_by: "分类"
-        sorts:
-          - field: "相关性评分"
-            direction: "desc"
-
   # 多维表格配置
   bitable:
     app_token: ${oc.env:FEISHU_BITABLE_APP_TOKEN,""} # 多维表格的app_token
     papers_table_id: ${oc.env:FEISHU_PAPERS_TABLE_ID,""} # 论文主表ID
     relations_table_id: ${oc.env:FEISHU_RELATIONS_TABLE_ID,""} # 领域关系表ID
+
+  # 群聊通知配置
+  chat_notification:
+    enabled: true # 是否启用群聊通知
+    notify_on_update: true # 有论文更新时发送通知
+    notify_on_new_papers: true # 有新论文时发送通知
+    min_papers_threshold: 1 # 最少论文数量才发送通知
+    max_recommended_papers: 1 # 每个领域推荐的论文数量
+    message_template: "default" # 消息模板类型
+    send_delay_seconds: 0.5 # 发送消息间隔(秒)，避免发送过快
 
 # 用户配置信息（可选）
 user_profile:

@@ -20,7 +20,7 @@ required_keywords:
   similarity_threshold: 0.8 # 模糊匹配相似度阈值
   keywords: # 必须包含的关键词列表，论文必须同时包含所有项
     - "robot OR robotics" # 必须包含robot或robotics其中之一
-    - "language OR LLM OR GPT" # 必须包含language、LLM或GPT其中之一
+    - "language OR LLM OR GPT OR VLA OR VLN" # 必须包含language、LLM或GPT其中之一
     # - "embodied OR multimodal" # 必须包含embodied或multimodal其中之一
     # OR逻辑示例：
     # - "vision OR visual" # 必须包含vision或visual其中之一

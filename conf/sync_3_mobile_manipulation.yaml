@@ -1,0 +1,112 @@
+defaults:
+  - default
+  - _self_
+user_profile:
+  name: 移动操作研究员
+  description: 专注于人形机器人移动操作和全身协调控制技术
+  research_area: mobile_manipulation
+
+search:
+  field: robotics
+  days: 14
+  max_results: 500
+  max_display: 10
+  min_score: 0.4
+
+# 必须包含关键词配置
+required_keywords:
+  enabled: true # 启用必须包含关键词过滤
+  fuzzy_match: true # 启用模糊匹配
+  similarity_threshold: 0.8 # 模糊匹配相似度阈值
+  keywords: # 必须包含的关键词列表，论文必须同时包含所有项
+    - "robotics OR robot" # 必须包含robot或robotics其中之一
+    - "mobile OR locomotion OR walking OR navigation" # 必须包含其中至少一个
+    - "manipulation OR grasping OR picking OR handling" # 必须包含其中至少一个
+    # - "humanoid OR robot" # 必须包含humanoid或robot其中之一
+    # 复杂OR逻辑示例：
+    # - "control OR coordination OR planning" # 控制相关的任选其一
+    # - "real-time OR dynamic OR adaptive" # 实时性相关的任选其一
+    # 显示效果：如果论文包含mobile、walking、grasping、picking
+    # 则显示: ["mobile", "walking", "grasping", "picking"]
+
+interest_keywords:
+  # 核心概念（高权重）
+  - "# 🎯 核心概念（高权重）"
+  - humanoid robot
+  - mobile manipulation
+  - whole body control
+  - coordinated control
+  - whole body manipulation
+  - simultaneous locomotion manipulation
+  - walking manipulation
+  - locomotion manipulation
+  - mobile manipulator
+  - humanoid manipulation
+
+  # 扩展概念（中权重）
+  - "# 🔧 扩展概念（中权重）"
+  - bimanual manipulation
+  - dual-arm manipulation
+  - tool manipulation
+  - object manipulation
+  - grasping while moving
+  - pick and place
+  - navigation and manipulation
+  - mobile grasping
+  - household tasks
+  - daily living activities
+  - assistive robotics
+  - home automation
+
+  # 相关概念（标准权重）
+  - "# 📝 相关概念（标准权重）"
+  - walk-man
+  - valkyrie manipulation
+  - digit manipulation
+  - asimo manipulation
+  - icub manipulation
+  - pr2 robot
+  - fetch robot
+  - tiago robot
+  - household robot
+  - service robot
+  - domestic robot
+  - cleaning robot
+  - cooking robot
+  - laundry robot
+
+exclude_keywords:
+  # 工业/生产相关（非移动操作、固定基座）
+  - industrial robot
+  - manufacturing
+  - welding
+  - painting
+  - automotive
+  - factory
+  - production line
+  - fixed base
+  - stationary
+
+  # 医疗/康复类（非家庭移动操作）
+  - medical robot
+  - surgical robot
+  - rehabilitation
+  - therapy
+  - prosthetic
+
+  # 无人/特种平台
+  - drone
+  - UAV
+  - underwater
+  - marine
+  - space robot
+  - satellite
+
+  # 纯运动/单纯步态（无操作任务）
+  - pure locomotion
+  - walking only
+  - running only
+  - jumping only
+  - locomotion without manipulation
+
+description: 人形机器人移动操作配置，专注于移动操作协调、家庭服务和复杂任务执行 [已优化关键词结构]

@@ -614,35 +614,60 @@ class FeishuBitableConnector:
         try:
             # 获取字段映射
             field_mapping = self._get_field_mapping(table_id)
+            print(f"     🔍 字段映射获取结果: {len(field_mapping)} 个字段")
+            for field_name, field_id in field_mapping.items():
+                print(f"       - {field_name}: {field_id}")
 
             # 构建视图属性
-            property_payload = {}
+            view_property = {}
 
-            # 处理排序条件（已验证可用）
+            # 处理排序条件
             sorts = view_config.get('sorts', [])
             if sorts:
+                print(f"     📊 处理排序条件: {len(sorts)} 个")
                 sort_info = self._build_sort_info(sorts, field_mapping)
                 if sort_info:
-                    property_payload["sort_info"] = sort_info
+                    view_property["sort_info"] = sort_info
+                    print(f"     ✅ 排序信息构建成功: {sort_info}")
+                else:
+                    print(f"     ❌ 排序信息构建失败")
 
-            # 处理分组条件（已验证可用）
+            # 处理分组条件
             group_by = view_config.get('group_by')
             if group_by:
                 group_info = self._build_group_info(group_by, field_mapping)
                 if group_info:
-                    property_payload["group_info"] = group_info
+                    view_property["group_info"] = group_info
+                    print(f"     ✅ 分组信息构建成功: {group_info}")
+
+            # 处理筛选条件
+            filters = view_config.get('filters', [])
+            if filters:
+                print(f"     🔍 处理筛选条件: {len(filters)} 个")
+                filter_info = self._build_filter_info(filters, field_mapping)
+                if filter_info:
+                    view_property["filter_info"] = filter_info
+                    print(f"     ✅ 筛选信息构建成功: {filter_info}")
 
             # 如果有属性需要设置，则更新视图
-            if property_payload:
-                update_payload = {"property": property_payload}
-                endpoint = f"bitable/v1/apps/{self.config.app_token}/tables/{table_id}/views/{view_id}"
-                self._make_request('PATCH', endpoint, json=update_payload)
-                return True
+            if view_property:
+                # 按照飞书API格式构建请求
+                update_payload = {"property": view_property}
+                print(f"     🔧 更新视图属性payload: {update_payload}")
 
-            return True
+                endpoint = f"bitable/v1/apps/{self.config.app_token}/tables/{table_id}/views/{view_id}"
+                result = self._make_request('PATCH', endpoint, json=update_payload)
+                print(f"     📋 更新API响应: {result}")
+                return True
+            else:
+                print(f"     ⚠️ 没有视图属性需要更新")
+                return True
 
         except Exception as e:
             print(f"   ❌ 配置视图属性失败: {e}")
+            import traceback
+
+            print(f"   🔍 详细错误: {traceback.format_exc()}")
             return False
 
     def _build_view_property(self, table_id: str, view_config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -926,17 +951,23 @@ class FeishuBitableConnector:
             field_name = sort_item.get('field')
             direction = sort_item.get('direction', 'desc')
 
+            print(f"       📊 处理排序字段: {field_name} ({direction})")
+
             if not field_name:
+                print(f"       ❌ 字段名为空")
                 continue
 
             field_id = field_mapping.get(field_name)
             if not field_id:
-                print(f"     ⚠️ 排序字段 '{field_name}' 未找到")
+                print(f"       ❌ 排序字段 '{field_name}' 未找到")
+                print(f"       🔍 可用字段: {list(field_mapping.keys())}")
                 continue
 
             sort_spec = {"field_id": field_id, "desc": direction == 'desc'}
             sort_specs.append(sort_spec)
+            print(f"       ✅ 排序规则添加: {sort_spec}")
 
+        print(f"     📊 最终排序规则: {sort_specs}")
         return sort_specs if sort_specs else None
 
     def _build_group_info(self, group_by: str, field_mapping: Dict[str, str]) -> Optional[List[Dict]]:

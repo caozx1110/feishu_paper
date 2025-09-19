@@ -5,6 +5,7 @@
 1. 论文信息中添加匹配关键词和相关性评分
 2. 每个主题/领域对应一个数据表
 3. 避免重复同步，根据arxiv id进行去重
+4. 群聊通知功能
 """
 
 import os
@@ -87,7 +88,16 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
 
         for record in existing_records:
             fields = record.get('fields', {})
-            arxiv_id = fields.get('ArXiv ID', '')
+            arxiv_id_field = fields.get('ArXiv ID', '')
+
+            # 处理ArXiv ID字段，可能是字符串或超链接格式
+            if isinstance(arxiv_id_field, dict):
+                # 超链接格式：{"text": "arxiv_id", "link": "url"}
+                arxiv_id = arxiv_id_field.get('text', '')
+            else:
+                # 字符串格式
+                arxiv_id = str(arxiv_id_field) if arxiv_id_field else ''
+
             if arxiv_id:
                 existing_arxiv_ids.add(arxiv_id)
 
@@ -318,6 +328,115 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
         print(f"   - 研究领域: {research_area}")
         print(f"   - 新增论文: {synced_count} 篇")
         print(f"   - 总记录数: {len(existing_arxiv_ids) + synced_count} 篇")
+
+        # 发送群聊通知（如果有新论文且配置启用，且不在批量模式）
+        if synced_count > 0:
+            try:
+                # 检查是否处于批量模式
+                batch_mode = os.getenv('BATCH_MODE', '0') == '1'
+                if batch_mode:
+                    print("ℹ️ 批量模式运行，跳过个别群聊通知")
+                else:
+                    chat_config = feishu_cfg.get('chat_notification', {})
+                    if chat_config.get('enabled', False):
+                        print("📢 准备发送群聊通知...")
+
+                        # 导入群聊通知模块
+                        from feishu_chat_notification import create_chat_notifier_from_config
+
+                        # 创建通知器
+                        notifier = create_chat_notifier_from_config(cfg)
+
+                        # 准备统计信息
+                        update_stats = {
+                            user_name.replace('研究员', '').strip()
+                            or research_area: {
+                                'new_count': synced_count,
+                                'total_count': len(existing_arxiv_ids) + synced_count,
+                                'table_name': table_display_name,
+                            }
+                        }
+
+                        # 准备论文数据（只包含新同步的论文，需要转换回原始格式）
+                        papers_for_notification = []
+                        synced_paper_index = 0
+
+                    for paper in papers:
+                        # 跳过已存在的记录，找到实际同步的论文
+                        if isinstance(paper, dict):
+                            arxiv_id = paper.get('arxiv_id', '')
+                        else:
+                            arxiv_id = getattr(paper, 'arxiv_id', getattr(paper, 'id', ''))
+
+                        if arxiv_id in existing_arxiv_ids:
+                            continue
+
+                        # 检查是否符合同步条件
+                        if isinstance(paper, dict):
+                            score = paper.get('final_score', paper.get('relevance_score', paper.get('score', 0)))
+                        else:
+                            score = getattr(
+                                paper, 'final_score', getattr(paper, 'relevance_score', getattr(paper, 'score', 0))
+                            )
+
+                        if score < sync_threshold:
+                            continue
+
+                        # 这是实际同步的论文
+                        if synced_paper_index < synced_count:
+                            if isinstance(paper, dict):
+                                paper_for_notification = paper.copy()
+                                # 确保有摘要预览
+                                if 'summary' in paper_for_notification and paper_for_notification['summary']:
+                                    summary = paper_for_notification['summary']
+                                    paper_for_notification['summary'] = (
+                                        summary[:200] + '...' if len(summary) > 200 else summary
+                                    )
+                            else:
+                                paper_for_notification = {
+                                    'title': getattr(paper, 'title', ''),
+                                    'arxiv_id': getattr(paper, 'arxiv_id', getattr(paper, 'id', '')),
+                                    'authors_str': ", ".join(getattr(paper, 'authors', [])),
+                                    'paper_url': getattr(paper, 'paper_url', getattr(paper, 'entry_id', '')),
+                                    'relevance_score': getattr(
+                                        paper,
+                                        'final_score',
+                                        getattr(paper, 'relevance_score', getattr(paper, 'score', 0)),
+                                    ),
+                                    'summary': (
+                                        (getattr(paper, 'summary', '')[:200] + '...')
+                                        if getattr(paper, 'summary', '')
+                                        else ''
+                                    ),
+                                }
+                            papers_for_notification.append(paper_for_notification)
+                            synced_paper_index += 1
+
+                    papers_by_field = {
+                        user_name.replace('研究员', '').strip() or research_area: papers_for_notification
+                    }
+
+                    # 生成表格链接
+                    table_links = {}
+                    field_name = user_name.replace('研究员', '').strip() or research_area
+                    table_link = notifier.generate_table_link(table_name=table_display_name, table_id=target_table_id)
+                    if table_link:
+                        table_links[field_name] = table_link
+                        print(f"📊 生成表格链接: {table_link}")
+                    else:
+                        print("⚠️ 无法生成表格链接")
+
+                        # 发送通知
+                        notification_success = notifier.notify_paper_updates(update_stats, papers_by_field, table_links)
+
+                        if notification_success:
+                            print("✅ 群聊通知发送成功")
+                        else:
+                            print("⚠️ 群聊通知发送失败或跳过")
+
+            except Exception as e:
+                print(f"⚠️ 群聊通知功能异常: {e}")
+                # 不影响主流程，继续执行
 
         return True
 

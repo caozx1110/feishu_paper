@@ -1,0 +1,94 @@
+defaults:
+  - default
+  - _self_
+user_profile:
+  name: LLM机器人研究员
+  description: 专注于大语言模型与机器人技术结合的研究
+  research_area: llm_robotics
+
+search:
+  field: robotics
+  days: 14
+  max_results: 500
+  max_display: 10
+  min_score: 0.3
+
+# 必须包含关键词配置
+required_keywords:
+  enabled: true # 启用必须包含关键词过滤
+  fuzzy_match: true # 启用模糊匹配
+  similarity_threshold: 0.8 # 模糊匹配相似度阈值
+  keywords: # 必须包含的关键词列表，论文必须同时包含所有项
+    - "robot OR robotics" # 必须包含robot或robotics其中之一
+    - "language OR LLM OR GPT OR VLA OR VLN" # 必须包含language、LLM或GPT其中之一
+    # - "embodied OR multimodal" # 必须包含embodied或multimodal其中之一
+    # OR逻辑示例：
+    # - "vision OR visual" # 必须包含vision或visual其中之一
+    # - "instruction OR command" # 必须包含instruction或command其中之一
+
+interest_keywords:
+  # 🎯 核心概念 (高权重)
+  - "# 🎯 核心概念 (高权重)"
+  - vla
+  - vision language action
+  - llm robot
+  - embodied ai
+  - rt-1
+  - rt-2
+  - rt-x
+  - palm-e
+  - saycan
+  - cliport
+  - peract
+  - vima
+  - flamingo robot
+  - roboflamingo
+
+  # 🔧 扩展概念 (中权重)
+  - "# 🔧 扩展概念 (中权重)"
+  - large language model robot
+  - language model robotics
+  - foundation model robotics
+  - multimodal robot
+  - embodied intelligence
+  - grounded language
+  - robot language model
+  - language grounding
+  - instruction following
+  - natural language robotics
+  - vision transformer robot
+  - language to action
+  - text to action
+  - instruction to action
+  - robot foundation model
+  - vlm robot
+  - visual language model
+  - code generation robot
+  - zero-shot robot
+  - few-shot robot
+  - in-context learning robot
+  - chain of thought robot
+  - reasoning robot
+
+exclude_keywords:
+  # 排除非 LLM + 机器人研究方向
+  - medical robot
+  - surgical robot
+  - rehabilitation robot
+  - therapy robot
+  - drug discovery
+  - pharmaceutical
+  - clinical
+  - biomedical
+  - healthcare robot
+  - pure mathematics
+  - theoretical physics
+  - quantum
+  - cryptography
+  - social robot
+  - human-robot interaction only
+  - simulation-only studies
+  - pure perception
+  - pure locomotion
+
+description: LLM与机器人结合领域配置，专注于VLA、多模态机器人和语言引导的机器人技术 [精炼关键词结构，核心优先]

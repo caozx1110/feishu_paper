@@ -202,6 +202,27 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
                 else:
                     matched_keywords_list = [kw.strip() for kw in str(matched_keywords).split(',') if kw and kw.strip()]
 
+            # 处理必须关键词匹配为多选项格式
+            required_keywords_list = []
+            if isinstance(paper, dict) and 'required_keyword_matches' in paper:
+                required_matches = paper['required_keyword_matches']
+                if required_matches:
+                    if isinstance(required_matches, list):
+                        required_keywords_list = [kw.strip() for kw in required_matches if kw and kw.strip()]
+                    else:
+                        required_keywords_list = [
+                            kw.strip() for kw in str(required_matches).split(',') if kw and kw.strip()
+                        ]
+            elif hasattr(paper, 'required_keyword_matches'):
+                required_matches = paper.required_keyword_matches
+                if required_matches:
+                    if isinstance(required_matches, list):
+                        required_keywords_list = [kw.strip() for kw in required_matches if kw and kw.strip()]
+                    else:
+                        required_keywords_list = [
+                            kw.strip() for kw in str(required_matches).split(',') if kw and kw.strip()
+                        ]
+
             # 处理研究领域为多选项格式
             research_area_list = []
             if research_area:
@@ -214,6 +235,7 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
             authors_list = authors_list[:10]  # 最多10个作者
             categories_list = categories_list[:5]  # 最多5个分类
             matched_keywords_list = matched_keywords_list[:10]  # 最多10个关键词
+            required_keywords_list = required_keywords_list[:5]  # 最多5个必须关键词
             research_area_list = research_area_list[:3]  # 最多3个研究领域
 
             # 构建论文数据
@@ -223,13 +245,14 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
                 "作者": authors_list,  # 多选项字段
                 "摘要": summary[:1000] if summary else "",  # 限制长度
                 "分类": categories_list,  # 多选项字段
-                "发布日期": int(published_date.timestamp() * 1000) if published_date else None,  # 时间戳格式
-                "更新日期": int(updated_date.timestamp() * 1000) if updated_date else None,  # 时间戳格式
+                "匹配关键词": matched_keywords_list,  # 多选项字段
+                "相关性评分": round(relevance_score, 2),
+                "研究领域": research_area_list,  # 多选项字段
                 "PDF链接": {"text": "PDF", "link": pdf_url} if pdf_url else None,  # 超链接格式
                 "论文链接": {"text": "ArXiv", "link": paper_url} if paper_url else None,  # 超链接格式
-                "研究领域": research_area_list,  # 多选项字段
-                "相关性评分": round(relevance_score, 2),
-                "匹配关键词": matched_keywords_list,  # 多选项字段
+                "必须关键词匹配": required_keywords_list,  # 多选项字段
+                "发布日期": int(published_date.timestamp() * 1000) if published_date else None,  # 时间戳格式
+                "更新日期": int(updated_date.timestamp() * 1000) if updated_date else None,  # 时间戳格式
             }
 
             new_papers_data.append(paper_data)

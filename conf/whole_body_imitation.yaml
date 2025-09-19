@@ -23,10 +23,10 @@ required_keywords:
   enabled: true # 启用必须包含关键词过滤
   fuzzy_match: true # 启用模糊匹配
   similarity_threshold: 0.8 # 模糊匹配相似度阈值
-  keywords: # 必须包含的关键词列表，论文必须至少包含其中一个
-    - "whole body" # 匹配 whole-body, wholebody 等
+  keywords: # 必须包含的关键词列表，论文必须同时包含所有关键词
     - "humanoid" # 匹配 humanoid, humanoids 等
     - "imitation" # 匹配 imitation, imitate 等
+    # - "whole body" # 匹配 whole-body, wholebody 等
     # - "demonstration" # 匹配 demonstration, demo 等
 
 interest_keywords:

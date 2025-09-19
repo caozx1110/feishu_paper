@@ -282,6 +282,7 @@ class FeishuBitableConnector:
             {"field_name": "研究领域", "type": 4},  # 多选项
             {"field_name": "PDF链接", "type": 15},  # 超链接
             {"field_name": "论文链接", "type": 15},  # 超链接
+            {"field_name": "必须关键词匹配", "type": 4},  # 多选项
             {
                 "field_name": "发布日期",
                 "type": 5,  # 日期

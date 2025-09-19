@@ -18,12 +18,12 @@ required_keywords:
   enabled: true # 启用必须包含关键词过滤
   fuzzy_match: true # 启用模糊匹配
   similarity_threshold: 0.8 # 模糊匹配相似度阈值
-  keywords: # 必须包含的关键词列表，论文必须至少包含其中一个
-    - "mobile manipulation" # 匹配 mobile manipulation, mobile manipulator 等
-    - "humanoid" # 匹配 humanoid, humanoids 等
+  keywords: # 必须包含的关键词列表，论文必须同时包含所有关键词
+    - "mobile" # 匹配 mobile, mobility 等
     - "manipulation" # 匹配 manipulation, manipulator, manipulate 等
-    - "whole body" # 匹配 whole-body, wholebody 等
-    - "coordinated" # 匹配 coordinated, coordination 等
+    # - "humanoid" # 匹配 humanoid, humanoids 等
+    # - "whole body" # 匹配 whole-body, wholebody 等
+    # - "coordinated" # 匹配 coordinated, coordination 等
 
 interest_keywords:
   # 核心概念（高权重）

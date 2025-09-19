@@ -39,7 +39,7 @@ required_keywords:
   # keywords:
   #   - "robot"  # 会匹配 robot, robots, robotics, robotic 等
   #   - "neural network"  # 会匹配 neural networks, neural-network 等
-  #   - "deep learning"  # 会匹配 deep-learning, deeplearning 等
+  #   - "deep AND learning"  # AND逻辑：必须同时包含deep和learning
 
 # 智能匹配配置
 intelligent_matching:

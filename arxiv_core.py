@@ -533,7 +533,7 @@ class PaperRanker:
         self, paper: Dict[str, Any], required_keywords_config: Dict[str, Any]
     ) -> Tuple[bool, List[str]]:
         """
-        检查论文是否包含必须的关键词（支持模糊匹配）
+        检查论文是否包含必须的关键词（所有关键词都必须匹配，支持模糊匹配）
 
         Args:
             paper: 论文信息字典
@@ -564,30 +564,54 @@ class PaperRanker:
 
         matched_keywords = []
 
+        # 检查所有关键词是否都匹配（AND逻辑：全部必须匹配）
         for keyword in required_keywords:
-            keyword_lower = keyword.lower()
-
-            # 精确匹配
-            if keyword_lower in full_text:
+            keyword_matched = self._check_single_keyword(keyword, full_text, fuzzy_match, similarity_threshold)
+            if keyword_matched:
+                # 只记录配置中的原始关键词
                 matched_keywords.append(keyword)
-                continue
+            else:
+                # 如果有任何一个关键词不匹配，则直接返回False
+                return False, []
 
-            # 模糊匹配（如果启用）
-            if fuzzy_match:
-                # 检查关键词变体
-                keyword_variants = self._generate_keyword_variants(keyword)
+        # 所有关键词都匹配才通过检查
+        return True, matched_keywords
 
-                for variant in keyword_variants:
-                    if variant.lower() in full_text:
-                        matched_keywords.append(f"{keyword}({variant})")
-                        break
-                else:
-                    # 使用字符串相似度匹配
-                    if self._fuzzy_match_required_keyword(keyword_lower, full_text, similarity_threshold):
-                        matched_keywords.append(f"{keyword}(模糊匹配)")
+    def _check_single_keyword(
+        self, keyword: str, full_text: str, fuzzy_match: bool, similarity_threshold: float
+    ) -> bool:
+        """
+        检查单个关键词是否匹配
 
-        # 如果至少匹配到一个必须关键词，则通过检查
-        return len(matched_keywords) > 0, matched_keywords
+        Args:
+            keyword: 关键词
+            full_text: 论文全文
+            fuzzy_match: 是否启用模糊匹配
+            similarity_threshold: 模糊匹配阈值
+
+        Returns:
+            bool: 是否匹配
+        """
+        keyword_lower = keyword.lower()
+
+        # 精确匹配
+        if keyword_lower in full_text:
+            return True
+
+        # 模糊匹配（如果启用）
+        if fuzzy_match:
+            # 检查关键词变体
+            keyword_variants = self._generate_keyword_variants(keyword)
+
+            for variant in keyword_variants:
+                if variant.lower() in full_text:
+                    return True
+
+            # 使用字符串相似度匹配
+            if self._fuzzy_match_required_keyword(keyword_lower, full_text, similarity_threshold):
+                return True
+
+        return False
 
     def _generate_keyword_variants(self, keyword: str) -> List[str]:
         """

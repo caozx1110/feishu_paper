@@ -145,14 +145,17 @@ def process_single_config(config_name: str) -> Dict[str, Any]:
                 # 设置环境变量避免个别通知
                 os.environ['BATCH_MODE'] = '1'
                 try:
-                    # 模拟检测新增论文的过程
-                    # 简化处理：假设前几篇是新增的
-                    synced_count = min(len(ranked_papers), 3)  # 模拟有少量新增
-
                     # 直接使用现有的同步函数
                     sync_result = sync_papers_to_feishu(ranked_papers, final_cfg)
 
-                    if not sync_result:
+                    # 处理返回值：数字表示同步数量，False表示失败
+                    if isinstance(sync_result, int):
+                        synced_count = sync_result
+                    elif sync_result is True:
+                        # 兼容旧版本返回True的情况，设为0
+                        synced_count = 0
+                    else:
+                        # False或其他表示失败
                         synced_count = 0
 
                 except Exception as sync_error:

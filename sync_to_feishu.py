@@ -269,7 +269,7 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
 
         if not new_papers_data:
             print("ℹ️ 没有新的论文需要同步")
-            return True
+            return 0
 
         # 过滤低分论文
         sync_threshold = feishu_cfg.get('sync_threshold', 0.0)
@@ -282,7 +282,7 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
 
         if not papers_to_sync:
             print(f"ℹ️ 没有符合同步条件的论文（阈值: {sync_threshold}）")
-            return True
+            return 0
 
         # 批量同步
         batch_size = feishu_cfg.get('batch_size', 20)
@@ -438,8 +438,8 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
                 print(f"⚠️ 群聊通知功能异常: {e}")
                 # 不影响主流程，继续执行
 
-        return True
+        return synced_count
 
     except Exception as e:
         print(f"❌ 飞书同步失败: {e}")
-        return False
+        return 0

@@ -1,6 +1,6 @@
 # 飞书论文同步系统
 
-> 基于Hydra配置管理的arXiv论文采集与飞书同步工具，支持多维表格集成和环境变量安全管理
+> 基于Hydra配置管理的arXiv论文采集与飞书同步工具，支持多维表格集成、定时批量同步和Docker部署
 
 ## 🚀 主要功能
 
@@ -10,19 +10,25 @@
 - 🔄 **双模式支持**: 同时支持Wiki文档和Bitable多维表格模式
 - 🛠️ **自动初始化**: 一键创建所需的表格结构
 
-### 2. 安全的配置管理
+### 2. 定时批量同步
+- ⏰ **定时执行**: 支持定时自动同步所有研究领域
+- 🔄 **批量处理**: 一次性处理多个sync配置文件
+- 📊 **统一通知**: 汇总所有更新信息发送到群聊
+- 🐳 **Docker支持**: 完整的容器化部署方案
+
+### 3. 安全的配置管理
 - ⚡ **Hydra集成**: 基于Hydra的现代化配置管理
 - 🔐 **环境变量**: 敏感信息通过环境变量安全管理
 - 📝 **配置模板**: 提供完整的配置示例和文档
 - 🎯 **零硬编码**: 所有配置项都可通过环境变量覆盖
 
-### 3. 智能论文处理
+### 4. 智能论文处理
 - 🤖 **官方API**: 使用官方 `arxiv` 库和 `lark-oapi` SDK
 - 🔍 **灵活搜索**: 支持关键词、分类、时间范围等多维度搜索
 - 📄 **完整信息**: 提取标题、作者、摘要、链接等完整论文信息
 - 🏷️ **智能分类**: 支持研究领域分类和标签管理
 
-### 4. 现代化工具集成
+### 5. 现代化工具集成
 - 📊 **多维表格**: 利用飞书强大的表格功能进行数据管理
 - 🔄 **批量操作**: 支持批量添加、更新论文记录
 - 📱 **移动友好**: 通过飞书移动端随时查看和管理论文
@@ -40,13 +46,57 @@ pip install -r requirements.txt
 - `lark-oapi`: 飞书开放平台SDK
 - `python-dotenv`: 环境变量管理
 
-## 🚀 快速开始
+## 🎯 快速开始
+
+### 方法一：使用统一管理工具（推荐）
+
+```bash
+# 1. 环境设置
+python tools/manager.py setup
+
+# 2. 配置向导（首次使用）
+python tools/setup_wizard.py
+
+# 3. 健康检查
+python tools/manager.py health
+
+# 4. 开始同步
+python tools/manager.py sync
+```
+
+### 方法二：Docker 部署（生产环境推荐）
+
+```bash
+# 1. 设置环境变量
+python tools/manager.py setup
+
+# 2. 启动 Docker 服务
+python tools/manager.py docker up
+
+# 3. 查看运行状态
+python tools/manager.py docker ps
+
+# 4. 查看日志
+python tools/manager.py docker logs
+```
+
+### 方法三：手动配置
+
+如果需要手动配置，请参考 [tools/README.md](tools/README.md) 获取详细的工具使用说明。
+
+## 📚 文档指南
+
+- **新用户**: [tools/README.md](tools/README.md) - 工具使用完整指南
+- **定时同步**: [SCHEDULED_SYNC_README.md](SCHEDULED_SYNC_README.md) - 定时同步详细说明
+- **Docker 部署**: [docker/README.md](docker/README.md) - 容器化部署指南
+
+## 🚀 传统使用方法
 
 ### 1. 设置环境变量
 
 复制环境变量模板：
 ```bash
-cp .env.example .env
+cp .env.template .env
 ```
 
 编辑 `.env` 文件，填入你的飞书配置信息：

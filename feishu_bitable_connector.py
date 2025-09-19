@@ -272,7 +272,7 @@ class FeishuBitableConnector:
     def create_domain_papers_table(self, table_name: str, research_area: str) -> Dict[str, Any]:
         """为特定研究领域创建论文表格"""
         fields = [
-            {"field_name": "ArXiv ID", "type": 1},  # 单行文本
+            {"field_name": "ArXiv ID", "type": 15},  # 超链接
             {"field_name": "标题", "type": 1},  # 单行文本
             {"field_name": "作者", "type": 4},  # 多选项
             {"field_name": "摘要", "type": 1},  # 单行文本
@@ -281,7 +281,6 @@ class FeishuBitableConnector:
             {"field_name": "相关性评分", "type": 2, "property": {"formatter": "0.00"}},  # 数字
             {"field_name": "研究领域", "type": 4},  # 多选项
             {"field_name": "PDF链接", "type": 15},  # 超链接
-            {"field_name": "论文链接", "type": 15},  # 超链接
             {"field_name": "必须关键词匹配", "type": 4},  # 多选项
             {
                 "field_name": "发布日期",

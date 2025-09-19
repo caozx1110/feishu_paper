@@ -240,7 +240,7 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
 
             # 构建论文数据
             paper_data = {
-                "ArXiv ID": arxiv_id,
+                "ArXiv ID": {"text": arxiv_id, "link": paper_url} if paper_url else arxiv_id,  # 超链接格式
                 "标题": title,
                 "作者": authors_list,  # 多选项字段
                 "摘要": summary[:1000] if summary else "",  # 限制长度
@@ -249,7 +249,6 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
                 "相关性评分": round(relevance_score, 2),
                 "研究领域": research_area_list,  # 多选项字段
                 "PDF链接": {"text": "PDF", "link": pdf_url} if pdf_url else None,  # 超链接格式
-                "论文链接": {"text": "ArXiv", "link": paper_url} if paper_url else None,  # 超链接格式
                 "必须关键词匹配": required_keywords_list,  # 多选项字段
                 "发布日期": int(published_date.timestamp() * 1000) if published_date else None,  # 时间戳格式
                 "更新日期": int(updated_date.timestamp() * 1000) if updated_date else None,  # 时间戳格式

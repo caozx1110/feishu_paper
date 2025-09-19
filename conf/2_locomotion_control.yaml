@@ -10,7 +10,6 @@ search:
   field: robotics
   days: 14
   max_results: 500
-  max_display: 10
   min_score: 0.35
 
 # 必须包含关键词配置

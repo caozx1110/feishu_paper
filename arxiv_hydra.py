@@ -18,6 +18,155 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from arxiv_core import ArxivAPI, PaperRanker
 from paper_display import PaperDisplayer
 
+# 飞书集成导入
+try:
+    from feishu_bitable_connector import FeishuBitableConnector
+    from sync_to_feishu import sync_papers_to_feishu
+
+    FEISHU_AVAILABLE = True
+except ImportError:
+    FEISHU_AVAILABLE = False
+    print("⚠️ 飞书模块未找到，将跳过飞书同步功能")
+
+
+def sync_to_feishu(papers, cfg: DictConfig):
+    """同步论文到飞书多维表格"""
+    if not FEISHU_AVAILABLE:
+        print("⚠️ 飞书模块不可用，跳过同步")
+        return False
+
+    feishu_cfg = cfg.get('feishu', {})
+    if not feishu_cfg.get('enabled', True):
+        print("ℹ️ 飞书同步已禁用")
+        return False
+
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv()
+
+        # 检查环境变量
+        required_vars = ['FEISHU_APP_ID', 'FEISHU_APP_SECRET', 'FEISHU_BITABLE_APP_TOKEN', 'FEISHU_PAPERS_TABLE_ID']
+
+        missing_vars = []
+        for var in required_vars:
+            if not os.getenv(var):
+                missing_vars.append(var)
+
+        # 检查访问令牌
+        has_user_token = bool(os.getenv('FEISHU_USER_ACCESS_TOKEN')) and 'xxxx' not in os.getenv(
+            'FEISHU_USER_ACCESS_TOKEN', ''
+        )
+        has_tenant_token = bool(os.getenv('FEISHU_TENANT_ACCESS_TOKEN')) and 'xxxx' not in os.getenv(
+            'FEISHU_TENANT_ACCESS_TOKEN', ''
+        )
+
+        if missing_vars or (not has_user_token and not has_tenant_token):
+            print("❌ 飞书配置不完整，请先运行 setup_feishu.py 配置")
+            return False
+
+        print("\n🔗 开始同步到飞书多维表格...")
+        connector = FeishuBitableConnector()
+
+        # 准备论文数据
+        feishu_papers = []
+        for paper in papers:
+            # 处理不同的论文对象格式
+            if isinstance(paper, dict):
+                # 字典格式的论文对象
+                paper_data = {
+                    "ArXiv ID": paper.get('arxiv_id', ''),
+                    "标题": paper.get('title', ''),
+                    "作者": paper.get('authors_str', ''),
+                    "摘要": (paper.get('summary', '')[:1000] if paper.get('summary') else ""),
+                    "分类": paper.get('categories_str', ''),
+                    "发布日期": paper.get('published_date').strftime("%Y-%m-%d") if paper.get('published_date') else "",
+                    "更新日期": paper.get('updated_date').strftime("%Y-%m-%d") if paper.get('updated_date') else "",
+                    "PDF链接": paper.get('pdf_url', ''),
+                    "论文链接": paper.get('paper_url', ''),
+                }
+            else:
+                # 对象格式的论文对象
+                paper_data = {
+                    "ArXiv ID": getattr(paper, 'id', getattr(paper, 'arxiv_id', '')),
+                    "标题": getattr(paper, 'title', ''),
+                    "作者": ", ".join(getattr(paper, 'authors', [])),
+                    "摘要": (getattr(paper, 'summary', '')[:1000] if getattr(paper, 'summary') else ""),
+                    "分类": ", ".join(getattr(paper, 'categories', [])),
+                    "发布日期": (
+                        getattr(paper, 'published', None).strftime("%Y-%m-%d")
+                        if getattr(paper, 'published', None)
+                        else ""
+                    ),
+                    "更新日期": (
+                        getattr(paper, 'updated', None).strftime("%Y-%m-%d") if getattr(paper, 'updated', None) else ""
+                    ),
+                    "PDF链接": getattr(paper, 'pdf_url', ''),
+                    "论文链接": getattr(paper, 'entry_id', ''),
+                }
+            feishu_papers.append(paper_data)
+
+        # 批量同步到飞书
+        sync_threshold = feishu_cfg.get('sync_threshold', 0.0)
+        batch_size = feishu_cfg.get('batch_size', 20)
+
+        # 过滤低分论文（如果有评分）
+        papers_to_sync = []
+        for i, paper_data in enumerate(feishu_papers):
+            if hasattr(papers[i], 'score') and papers[i].score < sync_threshold:
+                continue
+            papers_to_sync.append(paper_data)
+
+        if not papers_to_sync:
+            print("ℹ️ 没有符合同步条件的论文")
+            return True
+
+        print(f"📊 准备同步 {len(papers_to_sync)} 篇论文到飞书...")
+
+        # 分批同步
+        synced_count = 0
+        for i in range(0, len(papers_to_sync), batch_size):
+            batch = papers_to_sync[i : i + batch_size]
+
+            try:
+                result = connector.batch_insert_paper_records(batch)
+                if result and result.get('records'):
+                    batch_synced = len(result.get('records', []))
+                    synced_count += batch_synced
+                    print(f"✅ 第 {i//batch_size + 1} 批同步成功: {batch_synced} 篇")
+                else:
+                    print(f"⚠️ 第 {i//batch_size + 1} 批同步可能失败")
+            except Exception as e:
+                print(f"❌ 第 {i//batch_size + 1} 批同步失败: {e}")
+                continue
+
+        print(f"🎉 飞书同步完成！成功同步 {synced_count} 篇论文")
+
+        # 同步关系数据（可选）
+        research_area = cfg.get('user_profile', {}).get('research_area', 'unknown')
+        if research_area and research_area != 'unknown':
+            relations_table_id = os.getenv('FEISHU_RELATIONS_TABLE_ID')
+            if relations_table_id:
+                try:
+                    relation_data = {
+                        "论文ID": "batch_" + datetime.now().strftime("%Y%m%d_%H%M%S"),
+                        "领域ID": research_area,
+                        "领域名称": cfg.get('user_profile', {}).get('name', research_area),
+                        "相关性评分": 1.0,
+                        "匹配关键词": ", ".join(cfg.get('interest_keywords', [])[:5]),
+                    }
+
+                    connector.insert_record(relations_table_id, relation_data)
+                    print("✅ 领域关系数据同步完成")
+                except Exception as e:
+                    print(f"⚠️ 领域关系数据同步失败: {e}")
+
+        return True
+
+    except Exception as e:
+        print(f"❌ 飞书同步失败: {e}")
+        return False
+
 
 def load_keywords_from_config(cfg: DictConfig):
     """从配置中加载关键词"""
@@ -48,48 +197,45 @@ def _filter_keywords(keywords):
     """过滤关键词列表，移除注释行和空行"""
     if not keywords:
         return []
-    
+
     filtered = []
     for keyword in keywords:
         # 跳过空字符串
         if not keyword or not keyword.strip():
             continue
-        
+
         # 跳过注释行（以 # 开头）
         if keyword.strip().startswith('#'):
             continue
-            
+
         # 保留有效关键词
         filtered.append(keyword.strip())
-    
+
     return filtered
 
 
 def merge_configs(global_cfg: DictConfig, keyword_cfg: DictConfig) -> DictConfig:
     """合并全局配置和关键词配置，关键词配置优先"""
     merged_cfg = OmegaConf.merge(global_cfg, keyword_cfg)
-    
+
     # 如果关键词配置有search_config，则覆盖全局search配置
     if hasattr(keyword_cfg, 'search_config'):
         merged_cfg.search = OmegaConf.merge(merged_cfg.search, keyword_cfg.search_config)
-    
+
     # 如果关键词配置有其他_config后缀的配置，则覆盖对应的全局配置
     config_mappings = {
         'intelligent_matching_config': 'intelligent_matching',
         'download_config': 'download',
         'display_config': 'display',
-        'output_config': 'output'
+        'output_config': 'output',
     }
-    
+
     for config_key, global_key in config_mappings.items():
         if hasattr(keyword_cfg, config_key):
             if not hasattr(merged_cfg, global_key):
                 merged_cfg[global_key] = {}
-            merged_cfg[global_key] = OmegaConf.merge(
-                merged_cfg[global_key], 
-                keyword_cfg[config_key]
-            )
-    
+            merged_cfg[global_key] = OmegaConf.merge(merged_cfg[global_key], keyword_cfg[config_key])
+
     return merged_cfg
 
 
@@ -135,7 +281,9 @@ def print_config_info(cfg: DictConfig):
     if intelligent_cfg.get('enabled', False):
         print(f"🧠 智能匹配: 启用")
         weights = intelligent_cfg.get('score_weights', {})
-        print(f"   评分权重: 基础({weights.get('base', 0)}) 语义({weights.get('semantic', 0)}) 新颖性({weights.get('novelty', 0)})")
+        print(
+            f"   评分权重: 基础({weights.get('base', 0)}) 语义({weights.get('semantic', 0)}) 新颖性({weights.get('novelty', 0)})"
+        )
     else:
         print(f"🧠 智能匹配: 关闭")
 
@@ -156,47 +304,27 @@ def main(cfg: DictConfig) -> None:
     # 检查是否是扩展配置结构，如果是则进行配置合并
     if hasattr(cfg, 'search_config') or hasattr(cfg, 'user_profile'):
         # 创建基础配置结构
-        base_cfg = OmegaConf.create({
-            'search': {
-                'days': 7,
-                'max_results': 300,
-                'max_display': 10,
-                'min_score': 0.1,
-                'field': 'all'
-            },
-            'download': {
-                'enabled': False,
-                'max_downloads': 10,
-                'download_dir': 'downloads',
-                'create_metadata': True,
-                'create_index': True,
-                'force_download': False
-            },
-            'intelligent_matching': {
-                'enabled': False,
-                'score_weights': {
-                    'base': 1.0,
-                    'semantic': 0.3,
-                    'author': 0.2,
-                    'novelty': 0.4,
-                    'citation': 0.3
+        base_cfg = OmegaConf.create(
+            {
+                'search': {'days': 7, 'max_results': 300, 'max_display': 10, 'min_score': 0.1, 'field': 'all'},
+                'download': {
+                    'enabled': False,
+                    'max_downloads': 10,
+                    'download_dir': 'downloads',
+                    'create_metadata': True,
+                    'create_index': True,
+                    'force_download': False,
                 },
-                'fuzzy_threshold': 0.8,
-                'time_decay_days': 30
-            },
-            'display': {
-                'show_ranking': True,
-                'show_scores': True,
-                'show_breakdown': False,
-                'stats': True
-            },
-            'output': {
-                'save': True,
-                'save_keywords': False,
-                'include_scores': True,
-                'format': 'markdown'
+                'intelligent_matching': {
+                    'enabled': False,
+                    'score_weights': {'base': 1.0, 'semantic': 0.3, 'author': 0.2, 'novelty': 0.4, 'citation': 0.3},
+                    'fuzzy_threshold': 0.8,
+                    'time_decay_days': 30,
+                },
+                'display': {'show_ranking': True, 'show_scores': True, 'show_breakdown': False, 'stats': True},
+                'output': {'save': True, 'save_keywords': False, 'include_scores': True, 'format': 'markdown'},
             }
-        })
+        )
         final_cfg = merge_configs(base_cfg, cfg)
     else:
         # 传统配置结构，直接使用
@@ -217,9 +345,9 @@ def main(cfg: DictConfig) -> None:
     # 获取论文 - 使用新的字段类型
     search_cfg = final_cfg.get('search', {})
     papers = arxiv_api.get_recent_papers(
-        days=search_cfg.get('days', 7), 
-        max_results=search_cfg.get('max_results', 300), 
-        field_type=search_cfg.get('field', 'all')
+        days=search_cfg.get('days', 7),
+        max_results=search_cfg.get('max_results', 300),
+        field_type=search_cfg.get('field', 'all'),
     )
 
     if not papers:
@@ -292,6 +420,10 @@ def main(cfg: DictConfig) -> None:
                     for failed in download_stats['failed_papers']:
                         print(f"   - {failed['title'][:50]}... ({failed['error']})")
 
+            # 同步到飞书多维表格
+            if FEISHU_AVAILABLE:
+                sync_papers_to_feishu(ranked_papers, final_cfg)
+
             display_cfg = final_cfg.get('display', {})
             if display_cfg.get('show_ranking', True):
                 if use_intelligent:
@@ -301,7 +433,9 @@ def main(cfg: DictConfig) -> None:
                     )
                 else:
                     displayer.display_ranked_papers(
-                        ranked_papers, search_cfg.get('max_display', 10), show_scores=display_cfg.get('show_scores', True)
+                        ranked_papers,
+                        search_cfg.get('max_display', 10),
+                        show_scores=display_cfg.get('show_scores', True),
                     )
 
             # 保存报告
@@ -313,14 +447,14 @@ def main(cfg: DictConfig) -> None:
                     actual_config_name = hydra_cfg.job.config_name
                 except:
                     actual_config_name = "unknown"
-                
+
                 # 获取研究领域名或用户名
                 research_area = ""
                 if hasattr(final_cfg, 'user_profile'):
                     research_area = final_cfg.user_profile.get('research_area', '')
                 elif hasattr(final_cfg, 'defaults'):
                     research_area = final_cfg.defaults[0].keywords if hasattr(final_cfg.defaults[0], 'keywords') else ''
-                
+
                 output_format = output_cfg.get('format', 'txt')
 
                 if output_format == 'markdown':
@@ -347,6 +481,10 @@ def main(cfg: DictConfig) -> None:
         # 常规显示
         displayer.display_papers_detailed(papers, search_cfg.get('max_display', 10))
 
+        # 同步到飞书多维表格（无关键词筛选）
+        if FEISHU_AVAILABLE:
+            sync_papers_to_feishu(papers, final_cfg)
+
         # PDF下载处理（无关键词筛选）
         download_cfg = final_cfg.get('download', {})
         if download_cfg.get('enabled', False) and papers:
@@ -369,25 +507,33 @@ def main(cfg: DictConfig) -> None:
                 actual_config_name = hydra_cfg.job.config_name
             except:
                 actual_config_name = "unknown"
-            
+
             # 获取研究领域名或用户名
             research_area = ""
             if hasattr(final_cfg, 'user_profile'):
                 research_area = final_cfg.user_profile.get('research_area', '')
             elif hasattr(final_cfg, 'defaults'):
                 research_area = final_cfg.defaults[0].keywords if hasattr(final_cfg.defaults[0], 'keywords') else ''
-                
+
             output_format = final_cfg.output.get('format', 'txt')
 
             if output_format == 'markdown':
                 displayer.save_papers_report_markdown(
-                    papers, field_name, final_cfg.search.days, include_scores=False, 
-                    config_name=actual_config_name, research_area=research_area
+                    papers,
+                    field_name,
+                    final_cfg.search.days,
+                    include_scores=False,
+                    config_name=actual_config_name,
+                    research_area=research_area,
                 )
             else:
                 displayer.save_papers_report(
-                    papers, field_name, final_cfg.search.days, include_scores=False, 
-                    config_name=actual_config_name, research_area=research_area
+                    papers,
+                    field_name,
+                    final_cfg.search.days,
+                    include_scores=False,
+                    config_name=actual_config_name,
+                    research_area=research_area,
                 )
 
     print(f"\n✅ 采集完成！")

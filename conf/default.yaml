@@ -64,6 +64,85 @@ output:
   include_scores: true # 包含评分信息
   format: "markdown" # 输出格式: markdown, txt
 
+# 飞书同步配置
+feishu:
+  enabled: true # 默认关闭飞书同步
+  auto_sync: true # 自动判断同步时机
+  field_id: "" # 领域ID，为空时使用user_profile.research_area
+  field_name: "" # 领域显示名称，为空时使用user_profile.name去掉"研究员"
+  sync_threshold: 0.3 # 最低评分阈值
+  batch_size: 50 # 批次处理大小
+  preserve_low_scores: true # 保留低分论文记录
+  update_existing: true # 更新已有记录
+  sync_interval_hours: 6 # 自动同步间隔(小时)
+
+  # 飞书API配置（使用环境变量）
+  api:
+    app_id: ${oc.env:FEISHU_APP_ID,""} # 从环境变量FEISHU_APP_ID读取
+    app_secret: ${oc.env:FEISHU_APP_SECRET,""} # 从环境变量FEISHU_APP_SECRET读取
+    # 访问令牌配置（二选一）
+    user_access_token: ${oc.env:FEISHU_USER_ACCESS_TOKEN,""} # 用户访问令牌
+    tenant_access_token: ${oc.env:FEISHU_TENANT_ACCESS_TOKEN,""} # 应用访问令牌
+    base_url: "https://open.feishu.cn/open-apis" # API基础URL
+    timeout: 30 # 请求超时时间(秒)
+    max_retries: 3 # 最大重试次数
+    retry_delay: 1.0 # 重试间隔(秒)
+
+  # Wiki文档配置
+  wiki:
+    space_token: ${oc.env:FEISHU_WIKI_SPACE_TOKEN,""} # Wiki空间token，如: BR1CwZrcaiFyYfkUEMEcZ6aunMj
+    papers_node_token: ${oc.env:FEISHU_PAPERS_NODE_TOKEN,""} # 论文节点token
+    relations_node_token: ${oc.env:FEISHU_RELATIONS_NODE_TOKEN,""} # 关系节点token
+
+  # 视图管理配置
+  views:
+    enabled: true # 是否启用视图管理
+    auto_cleanup: true # 是否自动清理多余视图
+    create_views: # 需要创建的视图列表
+      - name: "评分排序视图"
+        type: "sort"
+        description: "按相关性评分降序排列"
+        sorts:
+          - field: "相关性评分"
+            direction: "desc"
+
+      - name: "时间排序视图"
+        type: "sort"
+        description: "按发布时间降序排列"
+        sorts:
+          - field: "发布日期"
+            direction: "desc"
+
+      - name: "研究领域分组"
+        type: "group_sort"
+        description: "按研究领域分组，评分排序"
+        group_by: "研究领域"
+        sorts:
+          - field: "相关性评分"
+            direction: "desc"
+
+      - name: "作者分组"
+        type: "group_sort"
+        description: "按作者分组，评分排序"
+        group_by: "作者"
+        sorts:
+          - field: "相关性评分"
+            direction: "desc"
+
+      - name: "分类整理"
+        type: "group_sort"
+        description: "按论文分类分组"
+        group_by: "分类"
+        sorts:
+          - field: "相关性评分"
+            direction: "desc"
+
+  # 多维表格配置
+  bitable:
+    app_token: ${oc.env:FEISHU_BITABLE_APP_TOKEN,""} # 多维表格的app_token
+    papers_table_id: ${oc.env:FEISHU_PAPERS_TABLE_ID,""} # 论文主表ID
+    relations_table_id: ${oc.env:FEISHU_RELATIONS_TABLE_ID,""} # 领域关系表ID
+
 # 用户配置信息（可选）
 user_profile:
   name: "通用研究员"

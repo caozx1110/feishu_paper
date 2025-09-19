@@ -8,8 +8,8 @@ user_profile:
 
 search:
   field: robotics
-  days: 5
-  max_results: 200
+  days: 14
+  max_results: 500
   max_display: 10
   min_score: 0.3
 

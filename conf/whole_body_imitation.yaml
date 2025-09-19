@@ -6,6 +6,11 @@ user_profile:
   description: 专注于人形机器人全身控制和模仿学习技术
   research_area: whole_body_imitation
 
+feishu:
+  enabled: true
+  batch_size: 20
+  sync_threshold: 0.35
+
 search:
   field: robotics
   days: 14

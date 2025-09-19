@@ -1,5 +1,5 @@
 defaults:
-  - ../default
+  - default
   - _self_
 user_profile:
   name: 运动控制研究员
@@ -99,5 +99,11 @@ exclude_keywords:
   - stationary
   - social robot
   - human-robot interaction
+
+# 飞书同步配置
+# feishu:
+#   enabled: true # 启用飞书同步
+#   sync_threshold: 0.35 # 最低评分阈值
+#   batch_size: 20 # 批次处理大小
 
 description: 四足和人形机器人运动控制配置，专注于步态生成、平衡控制和地形适应 [精炼关键词结构，核心优先]

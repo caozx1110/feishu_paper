@@ -13,6 +13,18 @@ search:
   max_display: 10
   min_score: 0.35
 
+# 必须包含关键词配置
+required_keywords:
+  enabled: true # 启用必须包含关键词过滤
+  fuzzy_match: true # 启用模糊匹配
+  similarity_threshold: 0.8 # 模糊匹配相似度阈值
+  keywords: # 必须包含的关键词列表，论文必须至少包含其中一个
+    - "locomotion" # 匹配 locomotion, locomote 等
+    - "quadruped" # 匹配 quadruped, quadrupedal 等
+    - "biped" # 匹配 biped, bipedal 等
+    - "gait" # 匹配 gait, gaits 等
+    - "walking" # 匹配 walking, walk 等
+
 interest_keywords:
   # 🎯 核心概念（高权重）
   - "# 🎯 核心概念 (高权重)"

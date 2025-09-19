@@ -529,6 +529,150 @@ class PaperRanker:
             'cs.CL': 1.2,
         }
 
+    def check_required_keywords(
+        self, paper: Dict[str, Any], required_keywords_config: Dict[str, Any]
+    ) -> Tuple[bool, List[str]]:
+        """
+        检查论文是否包含必须的关键词（支持模糊匹配）
+
+        Args:
+            paper: 论文信息字典
+            required_keywords_config: 必须包含关键词配置
+
+        Returns:
+            tuple: (是否通过检查, 匹配到的关键词列表)
+        """
+        if not required_keywords_config.get('enabled', False):
+            return True, []
+
+        required_keywords = required_keywords_config.get('keywords', [])
+        if not required_keywords:
+            return True, []
+
+        # 提取论文文本信息
+        title = paper.get('title', '').lower()
+        summary = paper.get('summary', '').lower()
+        categories = paper.get('categories', [])
+        categories_str = ' '.join(categories).lower()
+        authors = paper.get('authors_str', '').lower()
+
+        # 组合所有文本用于搜索
+        full_text = f"{title} {summary} {categories_str} {authors}"
+
+        fuzzy_match = required_keywords_config.get('fuzzy_match', True)
+        similarity_threshold = required_keywords_config.get('similarity_threshold', 0.8)
+
+        matched_keywords = []
+
+        for keyword in required_keywords:
+            keyword_lower = keyword.lower()
+
+            # 精确匹配
+            if keyword_lower in full_text:
+                matched_keywords.append(keyword)
+                continue
+
+            # 模糊匹配（如果启用）
+            if fuzzy_match:
+                # 检查关键词变体
+                keyword_variants = self._generate_keyword_variants(keyword)
+
+                for variant in keyword_variants:
+                    if variant.lower() in full_text:
+                        matched_keywords.append(f"{keyword}({variant})")
+                        break
+                else:
+                    # 使用字符串相似度匹配
+                    if self._fuzzy_match_required_keyword(keyword_lower, full_text, similarity_threshold):
+                        matched_keywords.append(f"{keyword}(模糊匹配)")
+
+        # 如果至少匹配到一个必须关键词，则通过检查
+        return len(matched_keywords) > 0, matched_keywords
+
+    def _generate_keyword_variants(self, keyword: str) -> List[str]:
+        """
+        生成关键词变体
+
+        Args:
+            keyword: 原始关键词
+
+        Returns:
+            关键词变体列表
+        """
+        variants = [keyword]
+        keyword_lower = keyword.lower()
+
+        # 从同义词词典获取变体
+        for syn_key, syn_list in self.synonyms.items():
+            if syn_key in keyword_lower or keyword_lower in syn_key:
+                variants.extend(syn_list)
+
+        # 生成常见变体
+        # 复数形式
+        if not keyword.endswith('s'):
+            variants.append(keyword + 's')
+        if keyword.endswith('y'):
+            variants.append(keyword[:-1] + 'ies')
+
+        # 形容词形式
+        if keyword.endswith('e'):
+            variants.append(keyword[:-1] + 'ic')
+        else:
+            variants.append(keyword + 'ic')
+
+        # 连字符和空格变体
+        if ' ' in keyword:
+            variants.append(keyword.replace(' ', '-'))
+            variants.append(keyword.replace(' ', '_'))
+            variants.append(keyword.replace(' ', ''))
+        if '-' in keyword:
+            variants.append(keyword.replace('-', ' '))
+            variants.append(keyword.replace('-', '_'))
+            variants.append(keyword.replace('-', ''))
+
+        # 去除重复并返回
+        return list(set(variants))
+
+    def _fuzzy_match_required_keyword(self, keyword: str, text: str, threshold: float) -> bool:
+        """
+        对必须关键词进行模糊匹配
+
+        Args:
+            keyword: 关键词
+            text: 待匹配文本
+            threshold: 相似度阈值
+
+        Returns:
+            是否匹配
+        """
+        try:
+            from difflib import SequenceMatcher
+
+            # 分词处理
+            words = text.split()
+
+            # 检查与单个词的相似度
+            for word in words:
+                if len(word) >= 3:  # 只检查长度大于等于3的词
+                    similarity = SequenceMatcher(None, keyword, word).ratio()
+                    if similarity >= threshold:
+                        return True
+
+            # 检查与词组的相似度
+            keyword_words = keyword.split()
+            if len(keyword_words) > 1:
+                for i in range(len(words) - len(keyword_words) + 1):
+                    phrase = ' '.join(words[i : i + len(keyword_words)])
+                    similarity = SequenceMatcher(None, keyword, phrase).ratio()
+                    if similarity >= threshold:
+                        return True
+
+            return False
+
+        except ImportError:
+            # 如果没有difflib，使用简单的包含检查
+            return keyword in text
+
     def calculate_relevance_score(
         self,
         paper: Dict[str, Any],
@@ -689,9 +833,10 @@ class PaperRanker:
         use_advanced_scoring: bool = False,
         score_weights: Dict[str, float] = None,
         raw_interest_keywords: List[str] = None,
+        required_keywords_config: Dict[str, Any] = None,
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[str, Any]]:
         """
-        根据关注词条过滤和排序论文 (支持高级评分)
+        根据关注词条过滤和排序论文 (支持高级评分和必须关键词)
 
         Args:
             papers: 论文列表
@@ -700,6 +845,7 @@ class PaperRanker:
             min_score: 最小相关性分数阈值
             use_advanced_scoring: 是否使用高级智能评分
             score_weights: 评分权重配置
+            required_keywords_config: 必须包含关键词配置
 
         Returns:
             tuple: (ranked_papers, excluded_papers, score_stats)
@@ -711,28 +857,35 @@ class PaperRanker:
         if score_weights is None:
             score_weights = {'base': 1.0, 'semantic': 0.3, 'author': 0.2, 'novelty': 0.4, 'citation': 0.3}
 
-        if not interest_keywords:
+        # 计算每篇论文的相关性分数
+        scored_papers = []
+        excluded_papers = []
+
+        for paper in papers:
+            # 首先检查必须包含关键词
+            if required_keywords_config:
+                required_passed, required_matches = self.check_required_keywords(paper, required_keywords_config)
+                if not required_passed:
+                    paper['exclude_reason'] = "未包含必须关键词"
+                    excluded_papers.append(paper)
+                    continue
+                else:
+                    paper['required_keyword_matches'] = required_matches
+
             # 如果没有关注词条，只进行排除过滤
-            if exclude_keywords:
-                filtered_papers = []
-                excluded_papers = []
-                for paper in papers:
+            if not interest_keywords:
+                if exclude_keywords:
                     _, is_excluded, _, _ = self.calculate_relevance_score(
                         paper, [], exclude_keywords, raw_interest_keywords
                     )
                     if is_excluded:
                         excluded_papers.append(paper)
                     else:
-                        filtered_papers.append(paper)
-                return filtered_papers, excluded_papers, {}
-            else:
-                return papers, [], {}
+                        scored_papers.append(paper)
+                else:
+                    scored_papers.append(paper)
+                continue
 
-        # 计算每篇论文的相关性分数
-        scored_papers = []
-        excluded_papers = []
-
-        for paper in papers:
             if use_advanced_scoring:
                 # 使用高级评分
                 total_score, is_excluded, matched_interests, matched_excludes, score_breakdown = (
@@ -772,14 +925,17 @@ class PaperRanker:
 
         # 按相关性分数降序排序
         sort_key = 'final_score' if use_advanced_scoring else 'relevance_score'
-        ranked_papers = sorted(scored_papers, key=lambda x: x[sort_key], reverse=True)
+        ranked_papers = sorted(scored_papers, key=lambda x: x.get(sort_key, 0), reverse=True)
 
         # 统计信息
-        scores = [p[sort_key] for p in ranked_papers]
+        scores = [p.get(sort_key, 0) for p in ranked_papers]
+        required_filtered = len([p for p in excluded_papers if p.get('exclude_reason') == "未包含必须关键词"])
+
         score_stats = {
             'total_papers': len(papers),
             'ranked_papers': len(ranked_papers),
             'excluded_papers': len(excluded_papers),
+            'required_filtered': required_filtered,
             'max_score': max(scores) if scores else 0,
             'min_score': min(scores) if scores else 0,
             'avg_score': sum(scores) / len(scores) if scores else 0,

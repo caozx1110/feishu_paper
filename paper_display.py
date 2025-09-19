@@ -119,6 +119,11 @@ class PaperDisplayer:
         print(f"🎯 相关论文数: {score_stats['ranked_papers']}")
         print(f"🚫 排除论文数: {score_stats['excluded_papers']}")
 
+        # 显示必须关键词过滤统计
+        required_filtered = score_stats.get('required_filtered', 0)
+        if required_filtered > 0:
+            print(f"✅ 必须关键词过滤: {required_filtered}")
+
         if score_stats['ranked_papers'] > 0:
             print(f"📈 最高评分: {score_stats['max_score']:.2f}")
             print(f"📉 最低评分: {score_stats['min_score']:.2f}")
@@ -128,9 +133,14 @@ class PaperDisplayer:
         if excluded_papers:
             print(f"\n🚫 被排除的论文 (前5篇):")
             for i, paper in enumerate(excluded_papers[:5], 1):
-                exclude_reason = ', '.join(paper.get('exclude_reason', []))
+                exclude_reason = paper.get('exclude_reason', [])
+                if isinstance(exclude_reason, list):
+                    exclude_reason = ', '.join(exclude_reason)
                 print(f"  {i}. {paper['title'][:60]}...")
-                print(f"     排除原因: 匹配了排除词条 [{exclude_reason}]")
+                if exclude_reason == "未包含必须关键词":
+                    print(f"     排除原因: {exclude_reason}")
+                else:
+                    print(f"     排除原因: 匹配了排除词条 [{exclude_reason}]")
 
     def save_papers_report(
         self,

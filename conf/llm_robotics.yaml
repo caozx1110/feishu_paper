@@ -13,6 +13,17 @@ search:
   max_display: 10
   min_score: 0.3
 
+# 必须包含关键词配置
+required_keywords:
+  enabled: true # 启用必须包含关键词过滤
+  fuzzy_match: true # 启用模糊匹配
+  similarity_threshold: 0.8 # 模糊匹配相似度阈值
+  keywords: # 必须包含的关键词列表，论文必须至少包含其中一个
+    - "language model" # 匹配 language model, language models, LLM 等
+    - "robot" # 匹配 robot, robots, robotics, robotic 等
+    - "embodied" # 匹配 embodied, embodiment 等
+    - "multimodal" # 匹配 multimodal, multi-modal 等
+
 interest_keywords:
   # 🎯 核心概念 (高权重)
   - "# 🎯 核心概念 (高权重)"

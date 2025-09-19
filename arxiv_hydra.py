@@ -190,7 +190,10 @@ def load_keywords_from_config(cfg: DictConfig):
     interest_keywords = _filter_keywords(raw_interest_keywords)
     exclude_keywords = _filter_keywords(raw_exclude_keywords)
 
-    return interest_keywords, exclude_keywords, raw_interest_keywords
+    # 加载必须包含关键词配置
+    required_keywords_config = cfg.get('required_keywords', {})
+
+    return interest_keywords, exclude_keywords, raw_interest_keywords, required_keywords_config
 
 
 def _filter_keywords(keywords):
@@ -261,7 +264,9 @@ def print_config_info(cfg: DictConfig):
         print(f"� 当前配置: {keywords_name}")
 
     # 显示关键词
-    interest_keywords, exclude_keywords, raw_interest_keywords = load_keywords_from_config(cfg)
+    interest_keywords, exclude_keywords, raw_interest_keywords, required_keywords_config = load_keywords_from_config(
+        cfg
+    )
 
     if interest_keywords:
         print(f"\n🎯 关注词条 ({len(interest_keywords)}个):")
@@ -270,6 +275,17 @@ def print_config_info(cfg: DictConfig):
     if exclude_keywords:
         print(f"🚫 排除词条 ({len(exclude_keywords)}个):")
         print(f"   {', '.join(exclude_keywords[:5])}{'...' if len(exclude_keywords) > 5 else ''}")
+
+    # 显示必须关键词
+    if required_keywords_config.get('enabled', False):
+        required_keywords = required_keywords_config.get('keywords', [])
+        fuzzy_match = required_keywords_config.get('fuzzy_match', True)
+        threshold = required_keywords_config.get('similarity_threshold', 0.8)
+        print(f"✅ 必须包含关键词 ({len(required_keywords)}个):")
+        print(f"   {', '.join(required_keywords[:3])}{'...' if len(required_keywords) > 3 else ''}")
+        print(f"   模糊匹配: {'启用' if fuzzy_match else '禁用'}, 阈值: {threshold}")
+    else:
+        print(f"✅ 必须包含关键词: 未启用")
 
     print(f"⚙️  搜索参数:")
     search_cfg = cfg.get('search', {})
@@ -340,7 +356,9 @@ def main(cfg: DictConfig) -> None:
     print_config_info(final_cfg)
 
     # 加载关键词
-    interest_keywords, exclude_keywords, raw_interest_keywords = load_keywords_from_config(final_cfg)
+    interest_keywords, exclude_keywords, raw_interest_keywords, required_keywords_config = load_keywords_from_config(
+        final_cfg
+    )
 
     # 获取论文 - 使用新的字段类型
     search_cfg = final_cfg.get('search', {})
@@ -391,6 +409,7 @@ def main(cfg: DictConfig) -> None:
             use_advanced_scoring=use_intelligent,
             score_weights=score_weights,
             raw_interest_keywords=raw_interest_keywords,
+            required_keywords_config=required_keywords_config,
         )
 
         if score_stats:

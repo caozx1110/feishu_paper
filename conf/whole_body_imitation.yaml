@@ -23,11 +23,13 @@ required_keywords:
   enabled: true # 启用必须包含关键词过滤
   fuzzy_match: true # 启用模糊匹配
   similarity_threshold: 0.8 # 模糊匹配相似度阈值
-  keywords: # 必须包含的关键词列表，论文必须同时包含所有关键词
-    - "humanoid" # 匹配 humanoid, humanoids 等
-    - "imitation" # 匹配 imitation, imitate 等
-    # - "whole body" # 匹配 whole-body, wholebody 等
-    # - "demonstration" # 匹配 demonstration, demo 等
+  keywords: # 必须包含的关键词列表，论文必须同时包含所有项
+    - "humanoid OR robot" # 必须包含humanoid或robot其中之一
+    - "imitation OR demonstration" # 必须包含imitation或demonstration其中之一
+    # - "whole body" # 必须包含whole body
+    # OR逻辑示例：
+    # - "learning OR training" # 必须包含learning或training其中之一
+    # - "motion OR movement" # 必须包含motion或movement其中之一
 
 interest_keywords:
   # 🎯 核心概念 (高权重)

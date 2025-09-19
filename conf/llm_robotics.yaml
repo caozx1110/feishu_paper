@@ -18,11 +18,13 @@ required_keywords:
   enabled: true # 启用必须包含关键词过滤
   fuzzy_match: true # 启用模糊匹配
   similarity_threshold: 0.8 # 模糊匹配相似度阈值
-  keywords: # 必须包含的关键词列表，论文必须同时包含所有关键词
-    - "robot" # 匹配 robot, robots, robotics, robotic 等
-    - "language" # 匹配 language, linguistic 等
-    # - "embodied" # 匹配 embodied, embodiment 等
-    # - "multimodal" # 匹配 multimodal, multi-modal 等
+  keywords: # 必须包含的关键词列表，论文必须同时包含所有项
+    - "robot OR robotics" # 必须包含robot或robotics其中之一
+    - "language OR LLM OR GPT" # 必须包含language、LLM或GPT其中之一
+    # - "embodied OR multimodal" # 必须包含embodied或multimodal其中之一
+    # OR逻辑示例：
+    # - "vision OR visual" # 必须包含vision或visual其中之一
+    # - "instruction OR command" # 必须包含instruction或command其中之一
 
 interest_keywords:
   # 🎯 核心概念 (高权重)

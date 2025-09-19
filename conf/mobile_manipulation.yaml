@@ -18,12 +18,15 @@ required_keywords:
   enabled: true # 启用必须包含关键词过滤
   fuzzy_match: true # 启用模糊匹配
   similarity_threshold: 0.8 # 模糊匹配相似度阈值
-  keywords: # 必须包含的关键词列表，论文必须同时包含所有关键词
-    - "mobile" # 匹配 mobile, mobility 等
-    - "manipulation" # 匹配 manipulation, manipulator, manipulate 等
-    # - "humanoid" # 匹配 humanoid, humanoids 等
-    # - "whole body" # 匹配 whole-body, wholebody 等
-    # - "coordinated" # 匹配 coordinated, coordination 等
+  keywords: # 必须包含的关键词列表，论文必须同时包含所有项
+    - "mobile OR locomotion OR walking OR navigation" # 必须包含其中至少一个
+    - "manipulation OR grasping OR picking OR handling" # 必须包含其中至少一个
+    # - "humanoid OR robot" # 必须包含humanoid或robot其中之一
+    # 复杂OR逻辑示例：
+    # - "control OR coordination OR planning" # 控制相关的任选其一
+    # - "real-time OR dynamic OR adaptive" # 实时性相关的任选其一
+    # 显示效果：如果论文包含mobile、walking、grasping、picking
+    # 则显示: ["mobile", "walking", "grasping", "picking"]
 
 interest_keywords:
   # 核心概念（高权重）

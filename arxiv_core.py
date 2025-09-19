@@ -533,14 +533,19 @@ class PaperRanker:
         self, paper: Dict[str, Any], required_keywords_config: Dict[str, Any]
     ) -> Tuple[bool, List[str]]:
         """
-        检查论文是否包含必须的关键词（所有关键词都必须匹配，支持模糊匹配）
+        检查论文是否包含必须的关键词（支持AND和OR逻辑组合）
+
+        支持的格式:
+        - "robot" - 单个关键词
+        - "A OR B" - A或B任选其一
+        - ["mobile", "A OR B"] - 必须包含mobile且必须包含(A或B)
 
         Args:
             paper: 论文信息字典
             required_keywords_config: 必须包含关键词配置
 
         Returns:
-            tuple: (是否通过检查, 匹配到的关键词列表)
+            tuple: (是否通过检查, 实际匹配到的关键词列表)
         """
         if not required_keywords_config.get('enabled', False):
             return True, []
@@ -562,20 +567,80 @@ class PaperRanker:
         fuzzy_match = required_keywords_config.get('fuzzy_match', True)
         similarity_threshold = required_keywords_config.get('similarity_threshold', 0.8)
 
-        matched_keywords = []
+        all_matched_keywords = []
 
-        # 检查所有关键词是否都匹配（AND逻辑：全部必须匹配）
-        for keyword in required_keywords:
-            keyword_matched = self._check_single_keyword(keyword, full_text, fuzzy_match, similarity_threshold)
-            if keyword_matched:
-                # 只记录配置中的原始关键词
-                matched_keywords.append(keyword)
+        # 检查所有关键词项是否都匹配（AND逻辑：全部必须匹配）
+        for keyword_item in required_keywords:
+            matched_keywords = self._check_keyword_item_detailed(
+                keyword_item, full_text, fuzzy_match, similarity_threshold
+            )
+            if matched_keywords:
+                # 添加实际匹配到的关键词
+                all_matched_keywords.extend(matched_keywords)
             else:
-                # 如果有任何一个关键词不匹配，则直接返回False
+                # 如果有任何一个关键词项不匹配，则直接返回False
                 return False, []
 
-        # 所有关键词都匹配才通过检查
-        return True, matched_keywords
+        # 所有关键词项都匹配才通过检查
+        return True, all_matched_keywords
+
+    def _check_keyword_item_detailed(
+        self, keyword_item: str, full_text: str, fuzzy_match: bool, similarity_threshold: float
+    ) -> List[str]:
+        """
+        检查单个关键词项并返回具体匹配的关键词
+
+        Args:
+            keyword_item: 关键词项，可能是单个关键词或包含OR的组合
+            full_text: 论文全文
+            fuzzy_match: 是否启用模糊匹配
+            similarity_threshold: 模糊匹配阈值
+
+        Returns:
+            List[str]: 匹配到的具体关键词列表
+        """
+        # 检查是否包含OR逻辑
+        if ' or ' in keyword_item.lower() or ' OR ' in keyword_item:
+            return self._check_or_keyword_detailed(keyword_item, full_text, fuzzy_match, similarity_threshold)
+        else:
+            # 单个关键词
+            if self._check_single_keyword(keyword_item, full_text, fuzzy_match, similarity_threshold):
+                return [keyword_item]
+            else:
+                return []
+
+    def _check_or_keyword_detailed(
+        self, or_keyword: str, full_text: str, fuzzy_match: bool, similarity_threshold: float
+    ) -> List[str]:
+        """
+        检查OR逻辑关键词并返回所有匹配的关键词
+
+        Args:
+            or_keyword: 包含OR的关键词字符串，如 "A OR B OR C"
+            full_text: 论文全文
+            fuzzy_match: 是否启用模糊匹配
+            similarity_threshold: 模糊匹配阈值
+
+        Returns:
+            List[str]: 匹配到的具体关键词列表
+        """
+        # 分割OR关键词
+        or_parts = []
+        if ' OR ' in or_keyword:
+            or_parts = [part.strip() for part in or_keyword.split(' OR ')]
+        elif ' or ' in or_keyword:
+            or_parts = [part.strip() for part in or_keyword.split(' or ')]
+
+        if len(or_parts) < 2:
+            return []
+
+        matched_keywords = []
+        # 检查所有部分，收集所有匹配的关键词
+        for part in or_parts:
+            if self._check_single_keyword(part, full_text, fuzzy_match, similarity_threshold):
+                matched_keywords.append(part)
+
+        return matched_keywords
 
     def _check_single_keyword(
         self, keyword: str, full_text: str, fuzzy_match: bool, similarity_threshold: float

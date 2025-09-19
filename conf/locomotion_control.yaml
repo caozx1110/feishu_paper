@@ -18,12 +18,12 @@ required_keywords:
   enabled: true # 启用必须包含关键词过滤
   fuzzy_match: true # 启用模糊匹配
   similarity_threshold: 0.8 # 模糊匹配相似度阈值
-  keywords: # 必须包含的关键词列表，论文必须同时包含所有关键词
-    - "locomotion" # 匹配 locomotion, locomote 等
-    # - "quadruped" # 匹配 quadruped, quadrupedal 等
-    # - "biped" # 匹配 biped, bipedal 等
-    # - "gait" # 匹配 gait, gaits 等
-    # - "walking" # 匹配 walking, walk 等
+  keywords: # 必须包含的关键词列表，论文必须同时包含所有项
+    - "locomotion OR walking OR gait" # 必须包含locomotion、walking或gait其中之一
+    # - "quadruped OR biped" # 必须包含quadruped或biped其中之一
+    # OR逻辑示例：
+    # - "control OR controller" # 必须包含control或controller其中之一
+    # - "robot OR robotic" # 必须包含robot或robotic其中之一
 
 interest_keywords:
   # 🎯 核心概念（高权重）

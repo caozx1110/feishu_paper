@@ -12,7 +12,7 @@ search:
     # 可用领域: all, ai, robotics, cv, nlp, physics, math, stat, eess, q-bio
   days: 7 # 搜索天数
   max_results: 30 # 最大获取结果数
-  max_display: 15 # 最大显示数量
+  max_display: 0 # 最大显示数量
   min_score: 0.15 # 最小评分阈值
 
 # 关键词配置

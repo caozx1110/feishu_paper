@@ -1,0 +1,49 @@
+# 批量处理配置 - 处理所有sync开头的配置文件
+# 使用 --config-name=all 来触发批量同步模式
+
+# 基础配置 - 仅用于占位，实际处理时会被覆盖
+defaults:
+  - _self_
+
+# 用户配置
+user_profile:
+  name: "批量同步系统"
+  description: "自动处理所有sync配置文件的批量同步系统"
+  research_area: "batch_sync"
+# # 搜索配置
+# search_config:
+#   days: 30
+#   max_results: 500
+#   min_score: 0.1
+#   field: "all"
+
+# # 飞书配置
+# feishu:
+#   enabled: true
+#   sync_threshold: 0.1
+#   batch_size: 20
+#   chat_notification:
+#     enabled: true
+#     min_papers_threshold: 1
+
+# # 显示配置
+# display_config:
+#   show_ranking: true
+#   show_scores: true
+#   show_breakdown: false
+#   stats: true
+
+# # 输出配置
+# output_config:
+#   save: false # 批量模式不保存个别报告
+#   save_keywords: false
+#   include_scores: true
+#   format: "markdown"
+
+# # 下载配置
+# download_config:
+#   enabled: false # 批量模式不下载文件
+
+# # 智能匹配配置
+# intelligent_matching_config:
+#   enabled: false

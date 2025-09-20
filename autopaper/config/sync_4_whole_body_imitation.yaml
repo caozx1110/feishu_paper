@@ -1,0 +1,108 @@
+defaults:
+  - default
+  - _self_
+user_profile:
+  name: 全身控制研究员
+  description: 专注于人形机器人全身控制和模仿学习技术
+  research_area: whole_body_imitation
+
+feishu:
+  enabled: true
+  batch_size: 20
+  sync_threshold: 0.35
+
+search:
+  field: robotics
+  days: 14
+  max_results: 500
+  min_score: 0.35
+
+# 必须包含关键词配置
+required_keywords:
+  enabled: true # 启用必须包含关键词过滤
+  fuzzy_match: true # 启用模糊匹配
+  similarity_threshold: 0.8 # 模糊匹配相似度阈值
+  keywords: # 必须包含的关键词列表，论文必须同时包含所有项
+    - "humanoid OR robot" # 必须包含humanoid或robot其中之一
+    - "imitation OR demonstration OR track" # 必须包含imitation或demonstration其中之一
+    # - "whole body" # 必须包含whole body
+    # OR逻辑示例：
+    # - "learning OR training" # 必须包含learning或training其中之一
+    # - "motion OR movement" # 必须包含motion或movement其中之一
+
+interest_keywords:
+  # 🎯 核心概念 (高权重)
+  - "# 🎯 核心概念 (高权重)"
+  - wbc
+  - whole body control
+  - unified control
+  - learning from demonstration
+  - lfd
+  - imitation learning
+  - motion track
+  - skill transfer
+  - humanoid
+  - bipedal
+  - motion retargeting
+  - human motion
+
+  # 🔧 扩展概念 (中权重)
+  - "# 🔧 扩展概念 (中权重)"
+  - full body control
+  - integrated control
+  - holistic control
+  - whole body motion
+  - full body motion
+  - whole body coordination
+  - multi-limb coordination
+  - humanoid whole body
+  - humanoid coordination
+  - demonstration learning
+  - behavior cloning
+  - mimetic learning
+  - motion capture
+  - motion transfer
+  - kinematic retargeting
+  - dynamic retargeting
+  - skill acquisition
+  - motor learning
+  - embodied learning
+  - multi-modal learning
+  - trajectory learning
+  - policy learning
+
+exclude_keywords:
+  # 排除非全身控制或非模仿学习方向
+  - industrial robot
+  - manufacturing
+  - assembly line
+  - factory automation
+  - welding robot
+  - painting robot
+  - medical robot
+  - surgical robot
+  - rehabilitation robot
+  - therapy robot
+  - prosthetic
+  - exoskeleton
+  - wheelchair
+  - drone
+  - UAV
+  - quadcopter
+  - underwater robot
+  - marine robot
+  - space robot
+  - satellite
+  - automotive
+  - vehicle
+  - autonomous car
+  - single joint
+  - arm only
+  - hand only
+  - finger only
+  - pure locomotion
+  - pure perception
+  - social robot
+  - human-robot interaction only
+
+description: 人形机器人全身控制和模仿学习配置，专注于动作捕获、运动重定向和复杂技能学习 [精炼关键词结构，核心优先]

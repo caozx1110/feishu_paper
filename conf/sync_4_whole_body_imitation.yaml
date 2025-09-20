@@ -24,7 +24,7 @@ required_keywords:
   similarity_threshold: 0.8 # 模糊匹配相似度阈值
   keywords: # 必须包含的关键词列表，论文必须同时包含所有项
     - "humanoid OR robot" # 必须包含humanoid或robot其中之一
-    - "imitation OR demonstration" # 必须包含imitation或demonstration其中之一
+    - "imitation OR demonstration OR track" # 必须包含imitation或demonstration其中之一
     # - "whole body" # 必须包含whole body
     # OR逻辑示例：
     # - "learning OR training" # 必须包含learning或training其中之一
@@ -39,9 +39,10 @@ interest_keywords:
   - learning from demonstration
   - lfd
   - imitation learning
+  - motion track
   - skill transfer
-  - humanoid robot
-  - bipedal robot
+  - humanoid
+  - bipedal
   - motion retargeting
   - human motion
 

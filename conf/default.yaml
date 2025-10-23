@@ -10,10 +10,25 @@ search:
     # 交集: "ai&robotics" (注意：ArXiv API限制，实际为并集)
     # 直接分类: "cs.AI", ["cs.AI", "cs.LG"]
     # 可用领域: all, ai, robotics, cv, nlp, physics, math, stat, eess, q-bio
-  days: 7 # 搜索天数
+  days: 7 # 搜索天数（当不使用date_range时生效）
   max_results: 30 # 最大获取结果数
   max_display: 0 # 最大显示数量
   min_score: 0.15 # 最小评分阈值
+
+  # 日期范围配置（可选，启用时将覆盖days参数）
+  date_range:
+    enabled: false # 是否启用日期范围搜索
+    start_date: "" # 开始日期，格式: YYYY-MM-DD，如: "2023-01-01"
+    end_date: "" # 结束日期，格式: YYYY-MM-DD，如: "2023-12-31"，为空时使用当前日期
+
+  # 分批处理配置
+  batch_processing:
+    enabled: true # 是否启用分批处理
+    max_days_per_batch: 7 # 每批处理的最大天数
+    min_batch_interval: 1.0 # 批次间最小间隔时间(秒)，避免API限流
+    max_concurrent_batches: 1 # 最大并发批次数（建议为1以避免API限制）
+    auto_split: true # 是否自动根据日期范围大小拆分批次
+    batch_overlap_days: 0 # 批次间重叠天数，避免边界论文遗漏
 
 # 关键词配置
 interest_keywords:

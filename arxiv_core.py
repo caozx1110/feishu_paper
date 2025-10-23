@@ -89,31 +89,190 @@ class ArxivAPI:
             return []
 
     def get_recent_papers(
-        self, days: int = 7, max_results: int = 300, categories: List[str] = None, field_type: str = "all"
+        self,
+        days: int = 7,
+        max_results: int = 300,
+        categories: List[str] = None,
+        field_type: str = "all",
+        batch_config: Dict[str, Any] = None,
     ) -> List[Dict[str, Any]]:
         """
-        获取最近N天的论文
+        获取最近N天的论文，支持分批处理
+        现在直接调用日期范围搜索接口以提高稳定性
 
         Args:
             days: 天数范围
             max_results: 最大结果数
             categories: 分类列表
             field_type: 领域类型 (all, ai, robotics, cv, nlp)
+            batch_config: 分批处理配置
 
         Returns:
             论文信息列表
         """
-        # 根据field_type设置默认分类
-        if categories is None:
-            categories = self._get_field_categories(field_type)
-
         # 计算日期范围
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
 
-        return self.search_papers(
-            categories=categories, max_results=max_results, date_from=start_date, date_to=end_date
+        # 转换为日期字符串格式
+        start_date_str = start_date.strftime("%Y-%m-%d")
+        end_date_str = end_date.strftime("%Y-%m-%d")
+
+        print(f"📅 获取最近 {days} 天的论文 ({start_date_str} 到 {end_date_str})")
+
+        # 直接调用日期范围搜索方法，复用其稳定的分批处理逻辑
+        return self.get_papers_by_date_range(
+            start_date=start_date_str,
+            end_date=end_date_str,
+            max_results=max_results,
+            categories=categories,
+            field_type=field_type,
+            batch_config=batch_config,
         )
+
+    def get_papers_by_date_range(
+        self,
+        start_date: str,
+        end_date: str = None,
+        max_results: int = 300,
+        categories: List[str] = None,
+        field_type: str = "all",
+        batch_config: Dict[str, Any] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        根据日期范围获取论文，支持分批处理
+
+        Args:
+            start_date: 开始日期，格式: "YYYY-MM-DD"
+            end_date: 结束日期，格式: "YYYY-MM-DD"，为空时使用当前日期
+            max_results: 最大结果数
+            categories: 分类列表
+            field_type: 领域类型
+            batch_config: 分批处理配置
+
+        Returns:
+            论文信息列表
+        """
+        import time
+
+        # 解析日期
+        try:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
+        except ValueError as e:
+            print(f"❌ 日期格式错误: {e}")
+            return []
+
+        # 根据field_type设置默认分类
+        if categories is None:
+            categories = self._get_field_categories(field_type)
+
+        # 检查是否需要分批处理
+        total_days = (end_dt - start_dt).days + 1
+
+        # 默认分批处理配置
+        default_batch_config = {
+            "enabled": True,
+            "max_days_per_batch": 7,
+            "min_batch_interval": 1.0,
+            "auto_split": True,
+            "batch_overlap_days": 0,
+        }
+
+        if batch_config:
+            default_batch_config.update(batch_config)
+
+        batch_config = default_batch_config
+
+        print(f"📅 日期范围: {start_date} 到 {end_date or '当前日期'} (共 {total_days} 天)")
+
+        # 如果不启用分批处理或日期范围较小，直接搜索
+        if not batch_config.get("enabled", True) or total_days <= batch_config.get("max_days_per_batch", 7):
+            print("🔍 单次搜索...")
+            return self.search_papers(
+                categories=categories, max_results=max_results, date_from=start_dt, date_to=end_dt
+            )
+
+        # 分批处理
+        return self._batch_search_papers(
+            start_dt=start_dt, end_dt=end_dt, categories=categories, max_results=max_results, batch_config=batch_config
+        )
+
+    def _batch_search_papers(
+        self,
+        start_dt: datetime,
+        end_dt: datetime,
+        categories: List[str],
+        max_results: int,
+        batch_config: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        """
+        分批搜索论文
+
+        Args:
+            start_dt: 开始日期
+            end_dt: 结束日期
+            categories: 分类列表
+            max_results: 最大结果数
+            batch_config: 分批处理配置
+
+        Returns:
+            论文信息列表
+        """
+        import time
+
+        max_days_per_batch = batch_config.get("max_days_per_batch", 7)
+        min_batch_interval = batch_config.get("min_batch_interval", 1.0)
+        batch_overlap_days = batch_config.get("batch_overlap_days", 0)
+
+        all_papers = []
+        seen_papers = set()  # 用于去重
+        batch_num = 1
+
+        current_start = start_dt
+
+        print(f"🔄 启动分批处理，每批最多 {max_days_per_batch} 天，间隔 {min_batch_interval} 秒")
+
+        while current_start <= end_dt:
+            # 计算当前批次的结束日期
+            current_end = min(current_start + timedelta(days=max_days_per_batch - 1), end_dt)
+
+            print(f"📦 批次 {batch_num}: {current_start.strftime('%Y-%m-%d')} 到 {current_end.strftime('%Y-%m-%d')}")
+
+            try:
+                # 搜索当前批次
+                batch_papers = self.search_papers(
+                    categories=categories, max_results=max_results, date_from=current_start, date_to=current_end
+                )
+
+                # 去重并添加到总列表
+                new_papers_count = 0
+                for paper in batch_papers:
+                    paper_id = paper.get("arxiv_id", "")
+                    if paper_id and paper_id not in seen_papers:
+                        seen_papers.add(paper_id)
+                        all_papers.append(paper)
+                        new_papers_count += 1
+
+                print(f"✅ 批次 {batch_num} 完成: 获取 {len(batch_papers)} 篇论文，新增 {new_papers_count} 篇")
+
+            except Exception as e:
+                print(f"❌ 批次 {batch_num} 搜索失败: {e}")
+
+            # 准备下一批次
+            batch_num += 1
+
+            # 计算下一批次的开始日期（考虑重叠）
+            next_start = current_start + timedelta(days=max_days_per_batch - batch_overlap_days)
+            current_start = next_start
+
+            # 如果还有更多批次，则等待
+            if current_start <= end_dt and min_batch_interval > 0:
+                print(f"⏳ 等待 {min_batch_interval} 秒...")
+                time.sleep(min_batch_interval)
+
+        print(f"🎉 分批处理完成: 总共获取 {len(all_papers)} 篇去重后的论文")
+        return all_papers
 
     def download_pdf(
         self, paper: Dict[str, Any], force_download: bool = False, create_metadata: bool = True
@@ -130,12 +289,12 @@ class ArxivAPI:
             tuple: (是否成功, 文件路径或错误信息)
         """
         try:
-            arxiv_id = paper.get('arxiv_id', '')
+            arxiv_id = paper.get("arxiv_id", "")
             if not arxiv_id:
                 return False, "论文ID无效"
 
             # 生成文件名
-            safe_title = self._sanitize_filename(paper.get('title', ''))[:100]
+            safe_title = self._sanitize_filename(paper.get("title", ""))[:100]
             pdf_filename = f"{arxiv_id}_{safe_title}.pdf"
             pdf_path = self.download_dir / pdf_filename
 
@@ -157,7 +316,7 @@ class ArxivAPI:
 
             # 创建元数据文件
             if create_metadata:
-                self._create_paper_metadata(paper, pdf_path.with_suffix('.md'))
+                self._create_paper_metadata(paper, pdf_path.with_suffix(".md"))
 
             print(f"✅ 下载完成: {pdf_filename}")
             return True, str(pdf_path)
@@ -181,7 +340,7 @@ class ArxivAPI:
         Returns:
             下载统计信息
         """
-        stats = {'total': len(papers), 'downloaded': 0, 'skipped': 0, 'failed': 0, 'failed_papers': []}
+        stats = {"total": len(papers), "downloaded": 0, "skipped": 0, "failed": 0, "failed_papers": []}
 
         download_count = 0
         downloaded_papers = []
@@ -192,14 +351,14 @@ class ArxivAPI:
 
             success, result = self.download_pdf(paper)
             if success:
-                stats['downloaded'] += 1
-                downloaded_papers.append({**paper, 'pdf_path': result})
+                stats["downloaded"] += 1
+                downloaded_papers.append({**paper, "pdf_path": result})
             else:
                 if "已存在" in result:
-                    stats['skipped'] += 1
+                    stats["skipped"] += 1
                 else:
-                    stats['failed'] += 1
-                    stats['failed_papers'].append({'title': paper.get('title', ''), 'error': result})
+                    stats["failed"] += 1
+                    stats["failed_papers"].append({"title": paper.get("title", ""), "error": result})
 
             download_count += 1
 
@@ -258,21 +417,21 @@ class ArxivAPI:
         """解析arxiv.Result对象为论文信息字典"""
         try:
             return {
-                'title': result.title.strip(),
-                'authors': [author.name for author in result.authors],
-                'authors_str': ', '.join([author.name for author in result.authors]),
-                'summary': result.summary.strip(),
-                'published_date': result.published,
-                'updated_date': result.updated if result.updated else result.published,
-                'paper_url': result.entry_id,
-                'pdf_url': result.pdf_url,
-                'categories': [cat for cat in result.categories],
-                'categories_str': ', '.join(result.categories),
-                'arxiv_id': result.entry_id.split('/')[-1],
-                'primary_category': result.primary_category,
-                'comment': result.comment if result.comment else "",
-                'journal_ref': result.journal_ref if result.journal_ref else "",
-                'doi': result.doi if result.doi else "",
+                "title": result.title.strip(),
+                "authors": [author.name for author in result.authors],
+                "authors_str": ", ".join([author.name for author in result.authors]),
+                "summary": result.summary.strip(),
+                "published_date": result.published,
+                "updated_date": result.updated if result.updated else result.published,
+                "paper_url": result.entry_id,
+                "pdf_url": result.pdf_url,
+                "categories": [cat for cat in result.categories],
+                "categories_str": ", ".join(result.categories),
+                "arxiv_id": result.entry_id.split("/")[-1],
+                "primary_category": result.primary_category,
+                "comment": result.comment if result.comment else "",
+                "journal_ref": result.journal_ref if result.journal_ref else "",
+                "doi": result.doi if result.doi else "",
             }
         except Exception as e:
             print(f"解析论文信息时出错: {e}")
@@ -290,16 +449,16 @@ class ArxivAPI:
         """
         # 基础领域映射
         field_mappings = {
-            'ai': ['cs.AI', 'cs.LG', 'stat.ML'],
-            'robotics': ['cs.RO'],
-            'cv': ['cs.CV', 'eess.IV'],
-            'nlp': ['cs.CL'],
-            'physics': ['physics.comp-ph', 'cond-mat', 'quant-ph'],
-            'math': ['math.OC', 'math.ST', 'math.NA'],
-            'stat': ['stat.ML', 'stat.ME', 'stat.AP'],
-            'eess': ['eess.IV', 'eess.SP', 'eess.AS'],
-            'q-bio': ['q-bio.QM', 'q-bio.GN', 'q-bio.MN'],
-            'all': ['cs.AI', 'cs.LG', 'cs.RO', 'cs.CV', 'cs.CL', 'cs.CR', 'cs.DC', 'cs.DS', 'cs.HC', 'cs.IR'],
+            "ai": ["cs.AI", "cs.LG", "stat.ML"],
+            "robotics": ["cs.RO"],
+            "cv": ["cs.CV", "eess.IV"],
+            "nlp": ["cs.CL"],
+            "physics": ["physics.comp-ph", "cond-mat", "quant-ph"],
+            "math": ["math.OC", "math.ST", "math.NA"],
+            "stat": ["stat.ML", "stat.ME", "stat.AP"],
+            "eess": ["eess.IV", "eess.SP", "eess.AS"],
+            "q-bio": ["q-bio.QM", "q-bio.GN", "q-bio.MN"],
+            "all": ["cs.AI", "cs.LG", "cs.RO", "cs.CV", "cs.CL", "cs.CR", "cs.DC", "cs.DS", "cs.HC", "cs.IR"],
         }
 
         # 如果是列表，处理列表中的每个元素
@@ -314,16 +473,16 @@ class ArxivAPI:
             return self._parse_field_string(field_type, field_mappings)
 
         # 默认返回all
-        return field_mappings['all']
+        return field_mappings["all"]
 
     def _parse_field_string(self, field_str: str, field_mappings: dict) -> List[str]:
         """解析字段字符串，支持运算符"""
         field_str = field_str.strip()
 
         # 检查并集运算符 (+, |, or)
-        if '+' in field_str or '|' in field_str or ' or ' in field_str.lower():
+        if "+" in field_str or "|" in field_str or " or " in field_str.lower():
             # 分割并处理各个部分
-            separators = ['+', '|', ' or ', ' OR ']
+            separators = ["+", "|", " or ", " OR "]
             parts = [field_str]
 
             for sep in separators:
@@ -341,10 +500,10 @@ class ArxivAPI:
             return list(set(all_categories))  # 去重
 
         # 检查交集运算符 (&, and) - 注意：ArXiv API不直接支持交集
-        elif '&' in field_str or ' and ' in field_str.lower():
+        elif "&" in field_str or " and " in field_str.lower():
             print("⚠️  注意：ArXiv API不直接支持分类交集查询，将转换为并集查询")
             # 将交集转换为并集处理
-            separators = ['&', ' and ', ' AND ']
+            separators = ["&", " and ", " AND "]
             parts = [field_str]
 
             for sep in separators:
@@ -370,7 +529,7 @@ class ArxivAPI:
         field = field.strip()
 
         # 直接是ArXiv分类
-        if field.startswith(('cs.', 'stat.', 'math.', 'physics.', 'eess.', 'q-bio.', 'quant-ph', 'cond-mat')):
+        if field.startswith(("cs.", "stat.", "math.", "physics.", "eess.", "q-bio.", "quant-ph", "cond-mat")):
             return [field]
 
         # 查找预定义映射
@@ -385,11 +544,11 @@ class ArxivAPI:
         """清理文件名，移除不合法字符"""
         # 移除或替换不合法字符
         invalid_chars = r'[<>:"/\\|?*]'
-        sanitized = re.sub(invalid_chars, '_', filename)
+        sanitized = re.sub(invalid_chars, "_", filename)
         # 移除多余空格和标点
-        sanitized = re.sub(r'\s+', '_', sanitized)
-        sanitized = re.sub(r'[^\w\-_.]', '', sanitized)
-        return sanitized.strip('_')
+        sanitized = re.sub(r"\s+", "_", sanitized)
+        sanitized = re.sub(r"[^\w\-_.]", "", sanitized)
+        return sanitized.strip("_")
 
     def _create_paper_metadata(self, paper: Dict[str, Any], md_path: Path) -> None:
         """创建论文元数据Markdown文件"""
@@ -421,7 +580,7 @@ class ArxivAPI:
 *生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*
 """
 
-            with open(md_path, 'w', encoding='utf-8') as f:
+            with open(md_path, "w", encoding="utf-8") as f:
                 f.write(content)
 
         except Exception as e:
@@ -442,11 +601,11 @@ class ArxivAPI:
 """
 
             for i, paper in enumerate(papers, 1):
-                arxiv_id = paper.get('arxiv_id', 'N/A')
-                title = paper.get('title', 'Unknown Title')
-                authors = paper.get('authors_str', 'Unknown Authors')
-                categories = paper.get('categories_str', 'N/A')
-                published = paper.get('published_date', 'N/A')
+                arxiv_id = paper.get("arxiv_id", "N/A")
+                title = paper.get("title", "Unknown Title")
+                authors = paper.get("authors_str", "Unknown Authors")
+                categories = paper.get("categories_str", "N/A")
+                published = paper.get("published_date", "N/A")
 
                 content += f"""### {i}. {title}
 
@@ -460,7 +619,7 @@ class ArxivAPI:
 
 """
 
-            with open(index_path, 'w', encoding='utf-8') as f:
+            with open(index_path, "w", encoding="utf-8") as f:
                 f.write(content)
 
             print(f"📝 创建下载索引: {index_path}")
@@ -476,10 +635,10 @@ class PaperRanker:
         """初始化排序器"""
         # 关键词权重分层
         self.keyword_weights = {
-            'core': 2.5,  # 核心关键词权重（🎯标记的关键词）
-            'extended': 1.5,  # 扩展关键词权重（🔧标记的关键词）
-            'related': 1.0,  # 相关关键词权重
-            'default': 1.0,  # 默认权重
+            "core": 2.5,  # 核心关键词权重（🎯标记的关键词）
+            "extended": 1.5,  # 扩展关键词权重（🔧标记的关键词）
+            "related": 1.0,  # 相关关键词权重
+            "default": 1.0,  # 默认权重
         }
 
         # 匹配缓存
@@ -488,45 +647,45 @@ class PaperRanker:
 
         # 同义词词典 - 可以扩展
         self.synonyms = {
-            'robot': ['robotics', 'robotic', 'autonomous agent', 'android', 'humanoid'],
-            'ai': ['artificial intelligence', 'machine intelligence', 'intelligent system'],
-            'ml': ['machine learning', 'statistical learning', 'automated learning'],
-            'dl': ['deep learning', 'neural network', 'neural net', 'deep neural network'],
-            'cv': ['computer vision', 'visual perception', 'image analysis', 'visual recognition'],
-            'nlp': ['natural language processing', 'language processing', 'text processing'],
-            'llm': ['large language model', 'language model', 'generative model'],
-            'vla': ['vision language action', 'vision-language-action', 'multimodal action'],
-            'slam': ['simultaneous localization and mapping', 'localization and mapping'],
-            'rl': ['reinforcement learning', 'reward learning', 'policy learning'],
-            'transformer': ['attention mechanism', 'self-attention', 'multi-head attention'],
+            "robot": ["robotics", "robotic", "autonomous agent", "android", "humanoid"],
+            "ai": ["artificial intelligence", "machine intelligence", "intelligent system"],
+            "ml": ["machine learning", "statistical learning", "automated learning"],
+            "dl": ["deep learning", "neural network", "neural net", "deep neural network"],
+            "cv": ["computer vision", "visual perception", "image analysis", "visual recognition"],
+            "nlp": ["natural language processing", "language processing", "text processing"],
+            "llm": ["large language model", "language model", "generative model"],
+            "vla": ["vision language action", "vision-language-action", "multimodal action"],
+            "slam": ["simultaneous localization and mapping", "localization and mapping"],
+            "rl": ["reinforcement learning", "reward learning", "policy learning"],
+            "transformer": ["attention mechanism", "self-attention", "multi-head attention"],
         }
 
         # 常见缩写扩展
         self.abbreviations = {
-            'ai': 'artificial intelligence',
-            'ml': 'machine learning',
-            'dl': 'deep learning',
-            'cv': 'computer vision',
-            'nlp': 'natural language processing',
-            'llm': 'large language model',
-            'vla': 'vision language action',
-            'slam': 'simultaneous localization and mapping',
-            'rl': 'reinforcement learning',
-            'gnn': 'graph neural network',
-            'cnn': 'convolutional neural network',
-            'rnn': 'recurrent neural network',
-            'lstm': 'long short term memory',
-            'bert': 'bidirectional encoder representations from transformers',
-            'gpt': 'generative pre-trained transformer',
+            "ai": "artificial intelligence",
+            "ml": "machine learning",
+            "dl": "deep learning",
+            "cv": "computer vision",
+            "nlp": "natural language processing",
+            "llm": "large language model",
+            "vla": "vision language action",
+            "slam": "simultaneous localization and mapping",
+            "rl": "reinforcement learning",
+            "gnn": "graph neural network",
+            "cnn": "convolutional neural network",
+            "rnn": "recurrent neural network",
+            "lstm": "long short term memory",
+            "bert": "bidirectional encoder representations from transformers",
+            "gpt": "generative pre-trained transformer",
         }
 
         # 技术领域关键词权重
         self.domain_weights = {
-            'cs.AI': 1.5,
-            'cs.LG': 1.4,
-            'cs.RO': 1.3,
-            'cs.CV': 1.2,
-            'cs.CL': 1.2,
+            "cs.AI": 1.5,
+            "cs.LG": 1.4,
+            "cs.RO": 1.3,
+            "cs.CV": 1.2,
+            "cs.CL": 1.2,
         }
 
     def check_required_keywords(
@@ -547,25 +706,25 @@ class PaperRanker:
         Returns:
             tuple: (是否通过检查, 实际匹配到的关键词列表)
         """
-        if not required_keywords_config.get('enabled', False):
+        if not required_keywords_config.get("enabled", False):
             return True, []
 
-        required_keywords = required_keywords_config.get('keywords', [])
+        required_keywords = required_keywords_config.get("keywords", [])
         if not required_keywords:
             return True, []
 
         # 提取论文文本信息
-        title = paper.get('title', '').lower()
-        summary = paper.get('summary', '').lower()
-        categories = paper.get('categories', [])
-        categories_str = ' '.join(categories).lower()
-        authors = paper.get('authors_str', '').lower()
+        title = paper.get("title", "").lower()
+        summary = paper.get("summary", "").lower()
+        categories = paper.get("categories", [])
+        categories_str = " ".join(categories).lower()
+        authors = paper.get("authors_str", "").lower()
 
         # 组合所有文本用于搜索
         full_text = f"{title} {summary} {categories_str} {authors}"
 
-        fuzzy_match = required_keywords_config.get('fuzzy_match', True)
-        similarity_threshold = required_keywords_config.get('similarity_threshold', 0.8)
+        fuzzy_match = required_keywords_config.get("fuzzy_match", True)
+        similarity_threshold = required_keywords_config.get("similarity_threshold", 0.8)
 
         all_matched_keywords = []
 
@@ -600,7 +759,7 @@ class PaperRanker:
             List[str]: 匹配到的具体关键词列表
         """
         # 检查是否包含OR逻辑
-        if ' or ' in keyword_item.lower() or ' OR ' in keyword_item:
+        if " or " in keyword_item.lower() or " OR " in keyword_item:
             return self._check_or_keyword_detailed(keyword_item, full_text, fuzzy_match, similarity_threshold)
         else:
             # 单个关键词
@@ -626,10 +785,10 @@ class PaperRanker:
         """
         # 分割OR关键词
         or_parts = []
-        if ' OR ' in or_keyword:
-            or_parts = [part.strip() for part in or_keyword.split(' OR ')]
-        elif ' or ' in or_keyword:
-            or_parts = [part.strip() for part in or_keyword.split(' or ')]
+        if " OR " in or_keyword:
+            or_parts = [part.strip() for part in or_keyword.split(" OR ")]
+        elif " or " in or_keyword:
+            or_parts = [part.strip() for part in or_keyword.split(" or ")]
 
         if len(or_parts) < 2:
             return []
@@ -698,26 +857,26 @@ class PaperRanker:
 
         # 生成常见变体
         # 复数形式
-        if not keyword.endswith('s'):
-            variants.append(keyword + 's')
-        if keyword.endswith('y'):
-            variants.append(keyword[:-1] + 'ies')
+        if not keyword.endswith("s"):
+            variants.append(keyword + "s")
+        if keyword.endswith("y"):
+            variants.append(keyword[:-1] + "ies")
 
         # 形容词形式
-        if keyword.endswith('e'):
-            variants.append(keyword[:-1] + 'ic')
+        if keyword.endswith("e"):
+            variants.append(keyword[:-1] + "ic")
         else:
-            variants.append(keyword + 'ic')
+            variants.append(keyword + "ic")
 
         # 连字符和空格变体
-        if ' ' in keyword:
-            variants.append(keyword.replace(' ', '-'))
-            variants.append(keyword.replace(' ', '_'))
-            variants.append(keyword.replace(' ', ''))
-        if '-' in keyword:
-            variants.append(keyword.replace('-', ' '))
-            variants.append(keyword.replace('-', '_'))
-            variants.append(keyword.replace('-', ''))
+        if " " in keyword:
+            variants.append(keyword.replace(" ", "-"))
+            variants.append(keyword.replace(" ", "_"))
+            variants.append(keyword.replace(" ", ""))
+        if "-" in keyword:
+            variants.append(keyword.replace("-", " "))
+            variants.append(keyword.replace("-", "_"))
+            variants.append(keyword.replace("-", ""))
 
         # 去除重复并返回
         return list(set(variants))
@@ -751,7 +910,7 @@ class PaperRanker:
             keyword_words = keyword.split()
             if len(keyword_words) > 1:
                 for i in range(len(words) - len(keyword_words) + 1):
-                    phrase = ' '.join(words[i : i + len(keyword_words)])
+                    phrase = " ".join(words[i : i + len(keyword_words)])
                     similarity = SequenceMatcher(None, keyword, phrase).ratio()
                     if similarity >= threshold:
                         return True
@@ -799,12 +958,12 @@ class PaperRanker:
             return 1.0, False, ["*"], []
 
         # 提取论文文本信息
-        title = paper.get('title', '').lower()
-        summary = paper.get('summary', '').lower()
-        categories = paper.get('categories', [])
-        categories_str = ' '.join(categories).lower()
-        authors = paper.get('authors_str', '').lower()
-        paper_date = paper.get('published_date', datetime.now())
+        title = paper.get("title", "").lower()
+        summary = paper.get("summary", "").lower()
+        categories = paper.get("categories", [])
+        categories_str = " ".join(categories).lower()
+        authors = paper.get("authors_str", "").lower()
+        paper_date = paper.get("published_date", datetime.now())
 
         # 组合所有文本用于搜索
         full_text = f"{title} {summary} {categories_str} {authors}"
@@ -894,7 +1053,7 @@ class PaperRanker:
                     keyword_score += fuzzy_summary_score * 1.0  # 摘要模糊匹配权重
 
                 # 分类匹配
-                category_matches = len(re.findall(r'\b' + re.escape(variant) + r'\b', categories_str))
+                category_matches = len(re.findall(r"\b" + re.escape(variant) + r"\b", categories_str))
                 if category_matches > 0:
                     keyword_matched = True
                     keyword_score += category_matches * 1.5
@@ -944,7 +1103,7 @@ class PaperRanker:
 
         # 默认评分权重
         if score_weights is None:
-            score_weights = {'base': 1.0, 'semantic': 0.3, 'author': 0.2, 'novelty': 0.4, 'citation': 0.3}
+            score_weights = {"base": 1.0, "semantic": 0.3, "author": 0.2, "novelty": 0.4, "citation": 0.3}
 
         # 计算每篇论文的相关性分数
         scored_papers = []
@@ -955,11 +1114,11 @@ class PaperRanker:
             if required_keywords_config:
                 required_passed, required_matches = self.check_required_keywords(paper, required_keywords_config)
                 if not required_passed:
-                    paper['exclude_reason'] = "未包含必须关键词"
+                    paper["exclude_reason"] = "未包含必须关键词"
                     excluded_papers.append(paper)
                     continue
                 else:
-                    paper['required_keyword_matches'] = required_matches
+                    paper["required_keyword_matches"] = required_matches
 
             # 如果没有关注词条，只进行排除过滤
             if not interest_keywords:
@@ -985,15 +1144,15 @@ class PaperRanker:
 
                 # 应用权重
                 final_score = (
-                    score_breakdown.get('base_score', 0) * score_weights['base']
-                    + score_breakdown.get('semantic_boost', 0) * score_weights['semantic']
-                    + score_breakdown.get('author_boost', 0) * score_weights['author']
-                    + score_breakdown.get('novelty_boost', 0) * score_weights['novelty']
-                    + score_breakdown.get('citation_potential', 0) * score_weights['citation']
+                    score_breakdown.get("base_score", 0) * score_weights["base"]
+                    + score_breakdown.get("semantic_boost", 0) * score_weights["semantic"]
+                    + score_breakdown.get("author_boost", 0) * score_weights["author"]
+                    + score_breakdown.get("novelty_boost", 0) * score_weights["novelty"]
+                    + score_breakdown.get("citation_potential", 0) * score_weights["citation"]
                 )
 
-                paper['score_breakdown'] = score_breakdown
-                paper['final_score'] = final_score
+                paper["score_breakdown"] = score_breakdown
+                paper["final_score"] = final_score
 
             else:
                 # 使用基础评分
@@ -1002,33 +1161,33 @@ class PaperRanker:
                 )
 
             if is_excluded:
-                paper['exclude_reason'] = matched_excludes
+                paper["exclude_reason"] = matched_excludes
                 excluded_papers.append(paper)
             else:
-                paper['relevance_score'] = final_score
-                paper['matched_interests'] = matched_interests
-                paper['interest_match_count'] = len(matched_interests)
+                paper["relevance_score"] = final_score
+                paper["matched_interests"] = matched_interests
+                paper["interest_match_count"] = len(matched_interests)
 
                 if final_score >= min_score:
                     scored_papers.append(paper)
 
         # 按相关性分数降序排序
-        sort_key = 'final_score' if use_advanced_scoring else 'relevance_score'
+        sort_key = "final_score" if use_advanced_scoring else "relevance_score"
         ranked_papers = sorted(scored_papers, key=lambda x: x.get(sort_key, 0), reverse=True)
 
         # 统计信息
         scores = [p.get(sort_key, 0) for p in ranked_papers]
-        required_filtered = len([p for p in excluded_papers if p.get('exclude_reason') == "未包含必须关键词"])
+        required_filtered = len([p for p in excluded_papers if p.get("exclude_reason") == "未包含必须关键词"])
 
         score_stats = {
-            'total_papers': len(papers),
-            'ranked_papers': len(ranked_papers),
-            'excluded_papers': len(excluded_papers),
-            'required_filtered': required_filtered,
-            'max_score': max(scores) if scores else 0,
-            'min_score': min(scores) if scores else 0,
-            'avg_score': sum(scores) / len(scores) if scores else 0,
-            'use_advanced_scoring': use_advanced_scoring,
+            "total_papers": len(papers),
+            "ranked_papers": len(ranked_papers),
+            "excluded_papers": len(excluded_papers),
+            "required_filtered": required_filtered,
+            "max_score": max(scores) if scores else 0,
+            "min_score": min(scores) if scores else 0,
+            "avg_score": sum(scores) / len(scores) if scores else 0,
+            "use_advanced_scoring": use_advanced_scoring,
         }
 
         return ranked_papers, excluded_papers, score_stats
@@ -1036,54 +1195,54 @@ class PaperRanker:
     def get_field_papers(self, papers: List[Dict[str, Any]], field_type: str) -> List[Dict[str, Any]]:
         """根据领域类型过滤论文"""
         field_keywords = {
-            'ai': {
-                'keywords': [
-                    'artificial intelligence',
-                    'AI',
-                    'machine intelligence',
-                    'deep learning',
-                    'neural network',
+            "ai": {
+                "keywords": [
+                    "artificial intelligence",
+                    "AI",
+                    "machine intelligence",
+                    "deep learning",
+                    "neural network",
                 ],
-                'categories': ['cs.AI', 'cs.LG', 'stat.ML'],
+                "categories": ["cs.AI", "cs.LG", "stat.ML"],
             },
-            'robotics': {
-                'keywords': [
-                    'robot',
-                    'robotics',
-                    'robotic',
-                    'autonomous',
-                    'navigation',
-                    'manipulation',
-                    'SLAM',
-                    'motion planning',
-                    'path planning',
-                    'humanoid',
-                    'quadruped',
-                    'mobile robot',
+            "robotics": {
+                "keywords": [
+                    "robot",
+                    "robotics",
+                    "robotic",
+                    "autonomous",
+                    "navigation",
+                    "manipulation",
+                    "SLAM",
+                    "motion planning",
+                    "path planning",
+                    "humanoid",
+                    "quadruped",
+                    "mobile robot",
                 ],
-                'categories': ['cs.RO'],
+                "categories": ["cs.RO"],
             },
-            'cv': {
-                'keywords': [
-                    'computer vision',
-                    'image processing',
-                    'visual',
-                    'object detection',
-                    'image recognition',
-                    'video analysis',
+            "cv": {
+                "keywords": [
+                    "computer vision",
+                    "image processing",
+                    "visual",
+                    "object detection",
+                    "image recognition",
+                    "video analysis",
                 ],
-                'categories': ['cs.CV', 'eess.IV'],
+                "categories": ["cs.CV", "eess.IV"],
             },
-            'nlp': {
-                'keywords': [
-                    'natural language',
-                    'NLP',
-                    'language model',
-                    'text processing',
-                    'machine translation',
-                    'sentiment analysis',
+            "nlp": {
+                "keywords": [
+                    "natural language",
+                    "NLP",
+                    "language model",
+                    "text processing",
+                    "machine translation",
+                    "sentiment analysis",
                 ],
-                'categories': ['cs.CL'],
+                "categories": ["cs.CL"],
             },
         }
 
@@ -1095,15 +1254,15 @@ class PaperRanker:
 
         for paper in papers:
             # 检查分类匹配
-            if any(cat in paper.get('categories', []) for cat in field_config['categories']):
+            if any(cat in paper.get("categories", []) for cat in field_config["categories"]):
                 filtered_papers.append(paper)
                 continue
 
             # 检查关键词匹配
-            title_lower = paper['title'].lower()
-            summary_lower = paper['summary'].lower()
+            title_lower = paper["title"].lower()
+            summary_lower = paper["summary"].lower()
 
-            for keyword in field_config['keywords']:
+            for keyword in field_config["keywords"]:
                 if keyword.lower() in title_lower or keyword.lower() in summary_lower:
                     filtered_papers.append(paper)
                     break
@@ -1148,7 +1307,7 @@ class PaperRanker:
             return 1.0
 
         # 分词并限制检查范围以提高效率
-        words = re.findall(r'\b\w+\b', text.lower())
+        words = re.findall(r"\b\w+\b", text.lower())
         if not words:
             return 0.0
 
@@ -1171,7 +1330,7 @@ class PaperRanker:
         if keyword_lower in text.lower():
             return 1.0
 
-        words = re.findall(r'\b\w+\b', text.lower())
+        words = re.findall(r"\b\w+\b", text.lower())
         if not words:
             return 0.0
 
@@ -1240,7 +1399,7 @@ class PaperRanker:
 
     def _calculate_position_weight(self, keyword: str, title: str, summary: str) -> Dict[str, float]:
         """计算关键词在不同位置的权重"""
-        weights = {'title': 0.0, 'summary_start': 0.0, 'summary_mid': 0.0}
+        weights = {"title": 0.0, "summary_start": 0.0, "summary_mid": 0.0}
 
         keyword_lower = keyword.lower()
         title_lower = title.lower()
@@ -1258,7 +1417,7 @@ class PaperRanker:
             if keyword_position != -1:
                 # 标题开头的词权重更高
                 position_factor = max(0.5, 1.0 - (keyword_position / len(title_words)) * 0.5)
-                weights['title'] = 3.0 * position_factor
+                weights["title"] = 3.0 * position_factor
 
         # 摘要中的权重 - 区分前半部分和后半部分
         if keyword_lower in summary_lower:
@@ -1266,9 +1425,9 @@ class PaperRanker:
             keyword_pos = summary_lower.find(keyword_lower)
 
             if keyword_pos < summary_length * 0.3:  # 前30%
-                weights['summary_start'] = 2.5
+                weights["summary_start"] = 2.5
             else:  # 其他位置
-                weights['summary_mid'] = 1.5
+                weights["summary_mid"] = 1.5
 
         return weights
 
@@ -1303,11 +1462,11 @@ class PaperRanker:
             return base_score, excluded, matched_interests, matched_excludes, {}
 
         score_breakdown = {
-            'base_score': base_score,
-            'semantic_boost': 0.0,
-            'author_boost': 0.0,
-            'novelty_boost': 0.0,
-            'citation_potential': 0.0,
+            "base_score": base_score,
+            "semantic_boost": 0.0,
+            "author_boost": 0.0,
+            "novelty_boost": 0.0,
+            "citation_potential": 0.0,
         }
 
         total_score = base_score
@@ -1315,52 +1474,52 @@ class PaperRanker:
         # 语义增强分析
         if use_semantic_boost and interest_keywords:
             semantic_boost = self._calculate_semantic_boost(paper, interest_keywords)
-            score_breakdown['semantic_boost'] = semantic_boost
+            score_breakdown["semantic_boost"] = semantic_boost
             total_score += semantic_boost
 
         # 作者分析增强
         if use_author_analysis:
             author_boost = self._calculate_author_relevance(paper, interest_keywords)
-            score_breakdown['author_boost'] = author_boost
+            score_breakdown["author_boost"] = author_boost
             total_score += author_boost
 
         # 新颖性分析
         novelty_boost = self._calculate_novelty_score(paper)
-        score_breakdown['novelty_boost'] = novelty_boost
+        score_breakdown["novelty_boost"] = novelty_boost
         total_score += novelty_boost
 
         # 引用潜力预测
         citation_potential = self._predict_citation_potential(paper)
-        score_breakdown['citation_potential'] = citation_potential
+        score_breakdown["citation_potential"] = citation_potential
         total_score += citation_potential
 
         return total_score, excluded, matched_interests, matched_excludes, score_breakdown
 
     def _calculate_semantic_boost(self, paper: Dict[str, Any], keywords: List[str]) -> float:
         """计算语义相关性增强分数"""
-        title = paper.get('title', '').lower()
-        summary = paper.get('summary', '').lower()
+        title = paper.get("title", "").lower()
+        summary = paper.get("summary", "").lower()
 
         # 技术术语共现分析
         tech_terms = [
-            'neural',
-            'learning',
-            'model',
-            'algorithm',
-            'method',
-            'approach',
-            'framework',
-            'system',
-            'network',
-            'optimization',
-            'training',
-            'inference',
-            'prediction',
-            'classification',
-            'regression',
+            "neural",
+            "learning",
+            "model",
+            "algorithm",
+            "method",
+            "approach",
+            "framework",
+            "system",
+            "network",
+            "optimization",
+            "training",
+            "inference",
+            "prediction",
+            "classification",
+            "regression",
         ]
 
-        tech_term_count = sum(1 for term in tech_terms if term in title + ' ' + summary)
+        tech_term_count = sum(1 for term in tech_terms if term in title + " " + summary)
 
         # 基于技术密度的语义增强
         semantic_boost = min(tech_term_count * 0.1, 1.0)
@@ -1372,7 +1531,7 @@ class PaperRanker:
 
             # 寻找关键词附近的相关术语
             for text in [title, summary]:
-                sentences = re.split(r'[.!?]', text)
+                sentences = re.split(r"[.!?]", text)
                 for sentence in sentences:
                     if keyword_lower in sentence:
                         # 分析句子中的其他技术术语
@@ -1383,7 +1542,7 @@ class PaperRanker:
 
     def _calculate_author_relevance(self, paper: Dict[str, Any], keywords: List[str]) -> float:
         """基于作者信息计算相关性增强"""
-        authors = paper.get('authors', [])
+        authors = paper.get("authors", [])
         if not authors:
             return 0.0
 
@@ -1404,35 +1563,35 @@ class PaperRanker:
 
     def _calculate_novelty_score(self, paper: Dict[str, Any]) -> float:
         """计算论文新颖性分数"""
-        title = paper.get('title', '').lower()
-        summary = paper.get('summary', '').lower()
+        title = paper.get("title", "").lower()
+        summary = paper.get("summary", "").lower()
 
         # 新颖性指示词
         novelty_indicators = [
-            'novel',
-            'new',
-            'first',
-            'introduce',
-            'propose',
-            'present',
-            'innovative',
-            'breakthrough',
-            'pioneer',
-            'original',
-            'unprecedented',
-            'state-of-the-art',
-            'sota',
-            'outperform',
-            'improve',
-            'enhance',
-            'advance',
-            'superior',
-            'better than',
+            "novel",
+            "new",
+            "first",
+            "introduce",
+            "propose",
+            "present",
+            "innovative",
+            "breakthrough",
+            "pioneer",
+            "original",
+            "unprecedented",
+            "state-of-the-art",
+            "sota",
+            "outperform",
+            "improve",
+            "enhance",
+            "advance",
+            "superior",
+            "better than",
         ]
 
         novelty_count = 0
         for indicator in novelty_indicators:
-            novelty_count += len(re.findall(r'\b' + re.escape(indicator) + r'\b', title + ' ' + summary))
+            novelty_count += len(re.findall(r"\b" + re.escape(indicator) + r"\b", title + " " + summary))
 
         # 标题中的新颖性词汇权重更高
         title_novelty = sum(1 for indicator in novelty_indicators if indicator in title)
@@ -1442,31 +1601,31 @@ class PaperRanker:
 
     def _predict_citation_potential(self, paper: Dict[str, Any]) -> float:
         """预测论文的引用潜力"""
-        title = paper.get('title', '').lower()
-        summary = paper.get('summary', '').lower()
-        categories = paper.get('categories', [])
+        title = paper.get("title", "").lower()
+        summary = paper.get("summary", "").lower()
+        categories = paper.get("categories", [])
 
         # 高引用潜力指标
         high_impact_terms = [
-            'benchmark',
-            'dataset',
-            'survey',
-            'review',
-            'framework',
-            'open source',
-            'code available',
-            'reproducible',
-            'evaluation',
-            'comparison',
-            'analysis',
-            'comprehensive',
-            'extensive',
+            "benchmark",
+            "dataset",
+            "survey",
+            "review",
+            "framework",
+            "open source",
+            "code available",
+            "reproducible",
+            "evaluation",
+            "comparison",
+            "analysis",
+            "comprehensive",
+            "extensive",
         ]
 
-        impact_count = sum(1 for term in high_impact_terms if term in title + ' ' + summary)
+        impact_count = sum(1 for term in high_impact_terms if term in title + " " + summary)
 
         # 热门领域加权
-        hot_categories = ['cs.AI', 'cs.LG', 'cs.CV', 'cs.CL', 'cs.RO']
+        hot_categories = ["cs.AI", "cs.LG", "cs.CV", "cs.CL", "cs.RO"]
         category_boost = 0.2 if any(cat in hot_categories for cat in categories) else 0.0
 
         # 论文长度预测 (更长的摘要通常表示更全面的工作)
@@ -1553,7 +1712,7 @@ class PaperRanker:
             字典，键为关键词，值为权重类别 ('core', 'extended', 'default')
         """
         keyword_categories = {}
-        current_category = 'default'
+        current_category = "default"
 
         for keyword in raw_keywords:
             keyword = keyword.strip()
@@ -1563,13 +1722,13 @@ class PaperRanker:
                 continue
 
             # 检查注释行，确定当前分类
-            if keyword.startswith('#'):
-                if '🎯' in keyword or '核心概念' in keyword or '高权重' in keyword:
-                    current_category = 'core'
-                elif '🔧' in keyword or '扩展概念' in keyword or '中权重' in keyword:
-                    current_category = 'extended'
-                elif '📝' in keyword or '相关概念' in keyword or '标准权重' in keyword:
-                    current_category = 'related'
+            if keyword.startswith("#"):
+                if "🎯" in keyword or "核心概念" in keyword or "高权重" in keyword:
+                    current_category = "core"
+                elif "🔧" in keyword or "扩展概念" in keyword or "中权重" in keyword:
+                    current_category = "extended"
+                elif "📝" in keyword or "相关概念" in keyword or "标准权重" in keyword:
+                    current_category = "related"
                 # 注释行本身不作为关键词
                 continue
 
@@ -1589,5 +1748,5 @@ class PaperRanker:
         Returns:
             权重倍数
         """
-        category = keyword_categories.get(keyword, 'default')
-        return self.keyword_weights.get(category, self.keyword_weights['default'])
+        category = keyword_categories.get(keyword, "default")
+        return self.keyword_weights.get(category, self.keyword_weights["default"])

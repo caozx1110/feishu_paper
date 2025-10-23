@@ -8,7 +8,7 @@ user_profile:
 
 search:
   field: robotics
-  days: 14
+  days: 5
   max_results: 500
   min_score: 0.4
 
@@ -19,8 +19,9 @@ required_keywords:
   similarity_threshold: 0.8 # 模糊匹配相似度阈值
   keywords: # 必须包含的关键词列表，论文必须同时包含所有项
     - "robotics OR robot" # 必须包含robot或robotics其中之一
-    - "mobile OR locomotion OR walking OR navigation" # 必须包含其中至少一个
-    - "manipulation OR grasping OR picking OR handling" # 必须包含其中至少一个
+    - "humanoid"
+    - "mobile OR locomotion OR walking OR navigation OR loco OR loco-manipulation" # 必须包含其中至少一个
+    - "manipulation OR grasping OR picking OR handling OR loco-manipulation" # 必须包含其中至少一个
     # - "humanoid OR robot" # 必须包含humanoid或robot其中之一
     # 复杂OR逻辑示例：
     # - "control OR coordination OR planning" # 控制相关的任选其一

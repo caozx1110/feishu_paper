@@ -1,0 +1,17 @@
+# ArXiv论文定时采集任务配置
+# 每天上午10点（中国时间）自动运行论文采集
+#
+# 分钟 小时 日 月 星期   命令
+# 
+# 注意：确保系统时区设置为中国标准时间 (CST)
+# 检查时区命令: timedatectl status
+# 设置时区命令: sudo timedatectl set-timezone Asia/Shanghai
+
+# 每天上午10:00执行论文采集
+0 10 * * * /home/ubuntu/ws/feishu_paper/scripts/daily_arxiv_sync.sh
+
+# 可选：每周一上午10:30执行更大范围的论文采集（取消注释以启用）
+# 30 10 * * 1 cd /home/ubuntu/ws/feishu_paper && python scripts/scheduled_sync.py --days 7
+
+# 可选：每天晚上11:00执行系统健康检查（取消注释以启用）
+# 0 23 * * * cd /home/ubuntu/ws/feishu_paper && python scripts/health_check.py

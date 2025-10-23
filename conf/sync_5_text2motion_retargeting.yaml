@@ -1,0 +1,198 @@
+defaults:
+  - default
+  - _self_
+user_profile:
+  name: 动作生成研究员
+  description: 专注于文本到动作生成、运动重定向和人形机器人动作轨迹生成式模型
+  research_area: text2motion_retargeting
+
+feishu:
+  enabled: true
+  batch_size: 20
+  sync_threshold: 0.35
+
+search:
+  field: robotics
+  # days: 60 # 当不使用date_range时的默认天数
+  days: 5
+  max_results: 5000
+  min_score: 0.3
+
+  # 启用日期范围搜索进行测试
+  date_range:
+    enabled: false # 启用日期范围搜索
+    start_date: "2025-09-01" # 开始日期
+    end_date: "2025-09-30" # 结束日期（测试一个月的数据）
+
+  # 分批处理配置
+  batch_processing:
+    enabled: true # 启用分批处理
+    max_days_per_batch: 7 # 每批处理7天
+    min_batch_interval: 2.0 # 批次间间隔2秒
+    max_concurrent_batches: 1 # 串行处理
+    auto_split: true # 自动拆分
+    batch_overlap_days: 1 # 批次间重叠1天
+
+# 必须包含关键词配置
+required_keywords:
+  enabled: true # 启用必须包含关键词过滤
+  fuzzy_match: true # 启用模糊匹配
+  similarity_threshold: 0.8 # 模糊匹配相似度阈值
+  keywords: # 必须包含的关键词列表，论文必须同时包含所有项
+    - "motion OR text" # 必须包含motion或text其中之一
+    - "generate OR generation OR retarget" # 必须包含核心概念之一
+    - "humanoid OR human" # 必须包含人形相关
+    - "robot OR robotics" # 必须包含机器人相关
+    # 可选的更严格筛选条件：
+    # - "generation OR synthesis OR model" # 必须包含生成相关概念
+
+interest_keywords:
+  # 🎯 高权重核心关键词 - Text2Motion核心概念
+  - "# 🎯 高权重核心关键词"
+  - text to motion
+  - text2motion
+  - motion generation
+  - retargeting
+  - language to motion
+  - text-driven motion
+  - motion synthesis
+  - human to robot
+  - motion transfer
+  - trajectory generation
+  - pose generation
+  - motion diffusion
+  - motion transformer
+  - text motion generation
+  - language-guided motion
+  - generative motion model
+  - motion mapping
+  - video motion capture
+  - pose estimation
+  - motion extraction
+  - embodiment transfer
+  - neural motion synthesis
+
+  # 🤖 中权重相关关键词 - 机器人与深度学习方法
+  - "# 🤖 中权重相关关键词"
+  - humanoid robot
+  - robot motion
+  - human motion
+  - motion retargeting
+  - mocap retargeting
+  - cross-modal retargeting
+  - diffusion model
+  - transformer model
+  - deep learning
+  - human pose estimation
+  - motion planning
+  - robot trajectory
+  - action generation
+  - sequence generation
+  - variational autoencoder
+  - attention mechanism
+  - representation learning
+  - multi-modal learning
+  - cross-modal learning
+  - motion vae
+  - motion gan
+  - learned motion primitives
+  - human movement
+  - robot animation
+  - biped robot
+  - visual motion tracking
+  - motion reconstruction
+
+  # 🔧 低权重技术关键词 - 技术方法与应用
+  - "# 🔧 低权重技术关键词"
+  - inverse kinematics
+  - motion optimization
+  - reinforcement learning
+  - imitation learning
+  - domain adaptation
+  - sim2real
+  - motion control
+  - path planning
+  - skill transfer
+  - neural network
+  - encoder decoder
+  - latent space
+  - motion primitive
+  - bipedal robot
+  - legged robot
+  - manipulation robot
+  - service robot
+  - social robot
+  - forward kinematics
+  - trajectory optimization
+  - model predictive control
+  - learning from demonstration
+  - contrastive learning
+  - motion autoencoder
+
+exclude_keywords:
+  # 排除非相关机器人类型
+  - industrial robot
+  - manufacturing robot
+  - assembly robot
+  - welding robot
+  - painting robot
+  - medical robot
+  - surgical robot
+  - rehabilitation robot
+  - therapy robot
+  - prosthetic
+  - exoskeleton
+  - wheelchair
+  - drone
+  - UAV
+  - quadcopter
+  - underwater robot
+  - marine robot
+  - space robot
+  - satellite
+  - automotive robot
+  - vehicle robot
+  - autonomous car
+  - agricultural robot
+  - cleaning robot
+
+  # 排除非动作生成相关
+  - pure perception
+  - object detection
+  - image classification
+  - semantic segmentation
+  - face recognition
+  - speech recognition
+  - natural language processing only
+  - text classification
+  - sentiment analysis
+  - machine translation
+  - pure nlp
+  - computer vision only
+  - static pose
+  - single frame
+  - image analysis only
+
+  # 排除医疗健康相关
+  - medical
+  - clinical
+  - healthcare
+  - pharmaceutical
+  - drug
+  - disease
+  - diagnosis
+  - treatment
+  - therapy
+  - rehabilitation only
+  - physical therapy
+  - occupational therapy
+
+  # 排除纯理论研究
+  - pure mathematics
+  - theoretical physics
+  - abstract theory
+  - formal verification
+  - proof theory
+  - complexity theory
+
+description: 专注于文本到动作生成、运动重定向技术和人形机器人动作轨迹生成式模型的研究配置。涵盖从视频数据提取人类运动、跨模态运动转换、以及基于深度学习的动作生成方法。

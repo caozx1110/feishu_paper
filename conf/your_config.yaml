@@ -114,7 +114,7 @@ display:
   stats: true # 是否显示统计信息
 
 output:
-  save: true # 是否保存结果到文件
+  save: false # 是否保存结果到文件
   save_keywords: false # 是否保存匹配的关键词
   include_scores: true # 输出中是否包含评分
   format: "markdown" # 输出格式: markdown, json, csv

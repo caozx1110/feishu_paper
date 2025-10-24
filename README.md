@@ -135,39 +135,185 @@ python arxiv_hydra.py search.field=robotics
 
 ### 基础搜索与同步
 ```bash
+# 获取最近几天的机器人学论文
 python arxiv_hydra.py keywords=cs_ro_wildcard search.field=robotics
-```
 
-### 指定研究领域
-```bash
+# 指定研究领域
 python arxiv_hydra.py search.field=machine_learning
-```
 
-### 自定义关键词
-```bash
+# 自定义关键词
 python arxiv_hydra.py keywords=custom_keywords
 ```
 
-### 启用调试模式
+### 🆕 日期范围搜索
+
+新增的日期范围功能，支持指定具体时间段获取论文：
+
 ```bash
+# 获取特定日期范围的论文（2024年1月1日到15日）
+python arxiv_hydra.py search.date_range.start=2024-01-01 search.date_range.end=2024-01-15 search.field=robotics
+
+# 大范围日期搜索会自动分批处理
+python arxiv_hydra.py search.date_range.start=2023-01-01 search.date_range.end=2023-12-31 search.field=machine_learning
+
+# 配合自定义关键词使用
+python arxiv_hydra.py search.date_range.start=2024-06-01 search.date_range.end=2024-06-30 keywords=custom_keywords
+```
+
+**日期格式**: 支持 `YYYY-MM-DD` 格式，例如 `2024-01-15`
+
+**批量处理**: 当日期范围超过30天时，系统会自动分批处理以避免API限制
+
+### 🚀 自动化定时同步
+
+新增每日定时同步功能，每天上午10点（中国时间）自动运行：
+
+```bash
+# 安装定时同步脚本
+cd scripts
+chmod +x setup_daily_sync.sh
+./setup_daily_sync.sh
+
+# 手动运行日常同步
+./daily_arxiv_sync.sh
+```
+
+**定时功能特性**:
+- 📅 每日上午10:00自动执行
+- 🔄 支持多个研究领域并行同步
+- 📊 统一汇总同步结果
+- 📝 详细的日志记录
+
+### 调试与测试
+```bash
+# 启用调试模式查看详细信息
 python arxiv_hydra.py --debug search.field=robotics
+
+# 测试日期范围功能
+python arxiv_hydra.py search.date_range.start=2024-01-01 search.date_range.end=2024-01-03 search.field=robotics --debug
 ```
 
 ## ⚙️ 配置管理
 
+### 新用户配置指南
+
+#### 1. 复制配置模板
+```bash
+# 复制配置模板文件（推荐使用研究领域命名）
+cp conf/your_config.yaml conf/my_robotics.yaml
+# 或者
+cp conf/your_config.yaml conf/john_ai_research.yaml
+```
+
+#### 2. 编辑配置文件
+打开你的配置文件，按照以下指南配置：
+
+```yaml
+# 用户个人信息（用于生成个性化配置）
+user:
+  name: "张三"           # 你的姓名
+  email: "zhang@example.com"  # 邮箱（可选）
+  affiliation: "清华大学"    # 所属机构（可选）
+
+# 搜索配置
+search:
+  # 搜索模式: "days" 或 "date_range"
+  mode: "days"  # 新用户建议先使用 "days" 模式
+  
+  # 传统模式：获取最近几天的论文
+  days: 3
+  max_results: 50
+  
+  # 新功能：日期范围模式
+  date_range:
+    start: "2024-01-01"  # 开始日期 (YYYY-MM-DD)
+    end: "2024-01-31"    # 结束日期 (YYYY-MM-DD)
+  
+  # 批量处理设置（用于大日期范围）
+  batch:
+    size_days: 15        # 每批处理的天数
+    overlap_days: 1      # 批次间重叠天数（避免遗漏）
+    delay_seconds: 2     # 批次间延迟（避免API限制）
+
+# 关键词配置示例
+keywords:
+  robotics_basic:
+    - "robot"
+    - "robotics"
+    - "autonomous"
+  
+  ai_research:
+    - "artificial intelligence"
+    - "machine learning"
+    - "deep learning"
+    - "neural network"
+
+# 研究领域配置
+field: "robotics"  # 可选: robotics, machine_learning, computer_vision 等
+```
+
+#### 3. 配置文件命名规范
+
+建议使用以下命名规范，便于管理：
+
+```bash
+# 个人研究配置
+conf/张三_机器人学.yaml
+conf/john_ai_research.yaml
+
+# 领域专题配置  
+conf/团队_计算机视觉.yaml
+conf/lab_nlp_research.yaml
+
+# 项目配置
+conf/项目A_论文调研.yaml
+conf/grant_application_papers.yaml
+```
+
 ### 环境变量配置
 
-所有敏感信息都通过环境变量安全管理：
+所有敏感信息都通过环境变量安全管理，在 `.env` 文件中配置：
 
-| 变量名 | 说明 | 必需 | 示例 |
-|--------|------|------|------|
-| `FEISHU_APP_ID` | 飞书应用ID | ✅ | `cli_xxxxxxxxxx` |
-| `FEISHU_APP_SECRET` | 飞书应用密钥 | ✅ | `xxxxxxxxxxxxxxxx` |
-| `FEISHU_USER_ACCESS_TOKEN` | 用户访问令牌 | 🔀 | `u-xxxxxxxxxxxxxxx` |
-| `FEISHU_TENANT_ACCESS_TOKEN` | 应用访问令牌 | 🔀 | `t-xxxxxxxxxxxxxxx` |
-| `FEISHU_BITABLE_APP_TOKEN` | 多维表格app token | ✅ | `bascnxxxxxxxxxxxxxxx` |
-| `FEISHU_PAPERS_TABLE_ID` | 论文主表ID | ✅ | `tblxxxxxxxxxxxxxxx` |
-| `FEISHU_RELATIONS_TABLE_ID` | 关系表ID | ✅ | `tblxxxxxxxxxxxxxxx` |
+```bash
+# 飞书应用配置（从飞书开放平台获取）
+FEISHU_APP_ID=cli_xxxxxxxxxx
+FEISHU_APP_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# 访问令牌（二选一即可）
+FEISHU_USER_ACCESS_TOKEN=u-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# 或者
+FEISHU_TENANT_ACCESS_TOKEN=t-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# 多维表格配置
+FEISHU_BITABLE_APP_TOKEN=bascnxxxxxxxxxxxxxxxxxxxxxxxxx
+FEISHU_PAPERS_TABLE_ID=tblxxxxxxxxxxxxxxx
+FEISHU_RELATIONS_TABLE_ID=tblxxxxxxxxxxxxxxx
+```
+
+### 使用自定义配置
+
+```bash
+# 使用你的个人配置文件
+python arxiv_hydra.py --config-name=my_robotics
+
+# 使用配置文件 + 命令行覆盖
+python arxiv_hydra.py --config-name=my_robotics search.mode=date_range search.date_range.start=2024-01-01
+
+# 使用不同研究领域的配置
+python arxiv_hydra.py --config-name=john_ai_research
+```
+
+### 高级配置说明
+
+| 变量名                       | 说明              | 必需 | 示例                   |
+| ---------------------------- | ----------------- | ---- | ---------------------- |
+| `FEISHU_APP_ID`              | 飞书应用ID        | ✅    | `cli_xxxxxxxxxx`       |
+| `FEISHU_APP_SECRET`          | 飞书应用密钥      | ✅    | `xxxxxxxxxxxxxxxx`     |
+| `FEISHU_USER_ACCESS_TOKEN`   | 用户访问令牌      | 🔀    | `u-xxxxxxxxxxxxxxx`    |
+| `FEISHU_TENANT_ACCESS_TOKEN` | 应用访问令牌      | 🔀    | `t-xxxxxxxxxxxxxxx`    |
+| `FEISHU_BITABLE_APP_TOKEN`   | 多维表格app token | ✅    | `bascnxxxxxxxxxxxxxxx` |
+| `FEISHU_PAPERS_TABLE_ID`     | 论文主表ID        | ✅    | `tblxxxxxxxxxxxxxxx`   |
+| `FEISHU_RELATIONS_TABLE_ID`  | 关系表ID          | ✅    | `tblxxxxxxxxxxxxxxx`   |
 
 **注意**: `FEISHU_USER_ACCESS_TOKEN` 和 `FEISHU_TENANT_ACCESS_TOKEN` 二选一即可。
 
@@ -264,10 +410,10 @@ python get_token.py
 
 #### 令牌对比
 
-| 类型 | 前缀 | 获取方式 | 适用场景 | 推荐度 |
-|------|------|----------|----------|--------|
-| `tenant_access_token` | `t-` | 应用凭证自动获取 | 自动化、定时任务 | ⭐⭐⭐ |
-| `user_access_token` | `u-` | 用户授权获取 | 用户操作、个人数据 | ⭐⭐ |
+| 类型                  | 前缀 | 获取方式         | 适用场景           | 推荐度 |
+| --------------------- | ---- | ---------------- | ------------------ | ------ |
+| `tenant_access_token` | `t-` | 应用凭证自动获取 | 自动化、定时任务   | ⭐⭐⭐    |
+| `user_access_token`   | `u-` | 用户授权获取     | 用户操作、个人数据 | ⭐⭐     |
 
 ### 3. 创建多维表格
 
@@ -314,13 +460,13 @@ connector.batch_add_papers(papers_list)
 
 ### 支持的字段类型
 
-| 字段类型 | 类型ID | 说明 | 示例 |
-|----------|--------|------|------|
-| 单行文本 | 1 | 标题、作者等 | "论文标题" |
-| 数字 | 2 | 评分、引用数 | 95 |
-| 日期 | 5 | 发布时间 | "2023-01-15" |
-| 超链接 | 15 | arXiv、PDF链接 | "https://arxiv.org/abs/2301.12345" |
-| 多行文本 | 17 | 摘要、备注 | "详细的论文摘要..." |
+| 字段类型 | 类型ID | 说明           | 示例                               |
+| -------- | ------ | -------------- | ---------------------------------- |
+| 单行文本 | 1      | 标题、作者等   | "论文标题"                         |
+| 数字     | 2      | 评分、引用数   | 95                                 |
+| 日期     | 5      | 发布时间       | "2023-01-15"                       |
+| 超链接   | 15     | arXiv、PDF链接 | "https://arxiv.org/abs/2301.12345" |
+| 多行文本 | 17     | 摘要、备注     | "详细的论文摘要..."                |
 
 ### 表格结构设计
 
@@ -340,14 +486,78 @@ connector.batch_add_papers(papers_list)
 - **权重** (数字): 相关性权重
 - **备注** (多行文本): 额外说明
 
-## 🔍 故障排除
+## � 项目结构
+
+```
+feishu_paper/
+├── conf/                          # Hydra配置文件目录
+│   ├── default.yaml              # 默认配置模板
+│   ├── your_config.yaml          # 新用户配置模板
+│   ├── sync_*.yaml               # 各研究领域配置
+│   └── ...
+├── scripts/                       # 自动化脚本
+│   ├── daily_arxiv_sync.sh      # 每日同步主脚本
+│   ├── setup_daily_sync.sh      # 定时任务安装脚本
+│   └── crontab_daily_sync       # crontab配置文件
+├── autopaper/                     # 核心代码包
+│   ├── core/                     # 核心功能模块
+│   ├── utils/                    # 工具函数
+│   └── cli/                      # 命令行接口
+├── arxiv_core.py                 # arXiv API核心功能
+├── arxiv_hydra.py               # Hydra配置主入口
+├── feishu_bitable_connector.py  # 飞书多维表格连接器
+├── sync_to_feishu.py            # 飞书同步功能
+├── requirements.txt             # Python依赖
+├── .env                         # 环境变量配置
+└── README.md                    # 项目文档
+```
+
+## 🚀 新功能介绍
+
+### 📅 日期范围搜索
+
+支持指定具体日期范围获取论文，突破传统"最近几天"的限制：
+
+```bash
+# 获取2024年整个1月的机器人学论文
+python arxiv_hydra.py --config-name=my_config search.mode=date_range search.date_range.start=2024-01-01 search.date_range.end=2024-01-31
+
+# 大范围搜索自动分批处理（避免API限制）
+python arxiv_hydra.py search.mode=date_range search.date_range.start=2023-01-01 search.date_range.end=2023-12-31
+```
+
+**特性**:
+- 🎯 精确的日期控制：`YYYY-MM-DD` 格式
+- ⚡ 智能批量处理：大日期范围自动分批，避免API限制
+- 🔄 重叠处理：批次间自动重叠，确保不遗漏论文
+- ⏰ 自动延迟：批次间智能延迟，避免触发频率限制
+
+### 🕐 定时自动同步
+
+每日定时同步功能，解放双手实现全自动论文收集：
+
+```bash
+# 一键安装定时任务（每天上午10:00执行）
+cd scripts && ./setup_daily_sync.sh
+
+# 查看同步状态
+tail -f logs/daily_sync_$(date +%Y%m%d).log
+```
+
+**特性**:
+- 📅 定时执行：每日上午10:00（中国标准时间）
+- 🔄 批量处理：一次性处理所有研究领域配置
+- 📊 统一汇总：合并所有同步结果发送通知
+- 📝 详细日志：记录每次同步的详细信息
+
+## �🔍 故障排除
 
 ### 常见问题及解决方案
 
 #### 1. 认证相关问题
 
 **问题**: `401 Unauthorized` 或认证失败
-```
+```bash
 解决方案:
 - 检查 FEISHU_USER_ACCESS_TOKEN 是否正确
 - 确认token未过期（用户访问令牌有效期通常较短）
@@ -355,12 +565,72 @@ connector.batch_add_papers(papers_list)
 ```
 
 **问题**: `403 Forbidden` 权限不足
-```
+```bash
 解决方案:
 - 确认用户对目标多维表格有编辑权限
 - 检查应用是否被用户授权
 - 验证 app_token 是否正确
 ```
+
+#### 2. 日期范围搜索问题
+
+**问题**: 日期范围过大导致超时
+```bash
+解决方案:
+- 系统会自动分批处理，请耐心等待
+- 可通过配置调整批次大小: search.batch.size_days=10
+- 增加批次间延迟: search.batch.delay_seconds=5
+```
+
+**问题**: 批量处理中断
+```bash
+解决方案:
+- 检查网络连接是否稳定
+- 查看日志了解具体错误: --debug 参数
+- 重新运行时会自动跳过已处理的日期
+```
+
+#### 3. 定时同步问题
+
+**问题**: crontab任务未执行
+```bash
+解决方案:
+- 确认crontab服务运行: sudo systemctl status cron
+- 检查用户权限: crontab -l
+- 查看系统日志: sudo journalctl -u cron
+```
+
+**问题**: conda环境无法激活
+```bash
+解决方案:
+- 确认conda已正确安装
+- 检查环境路径: conda info --envs
+- 手动测试脚本: cd scripts && ./daily_arxiv_sync.sh
+```
+
+## 🤝 贡献指南
+
+欢迎贡献代码和建议！请遵循以下步骤：
+
+1. Fork 项目
+2. 创建特性分支: `git checkout -b feature-amazing-feature`
+3. 提交更改: `git commit -m 'Add some amazing feature'`
+4. 推送分支: `git push origin feature-amazing-feature`
+5. 创建 Pull Request
+
+## 📄 许可证
+
+本项目采用 MIT 许可证。详情请查看 [LICENSE](LICENSE) 文件。
+
+## 🙏 致谢
+
+- [arXiv](https://arxiv.org/) - 提供优秀的学术论文平台
+- [飞书开放平台](https://open.feishu.cn/) - 提供强大的协作API
+- [Hydra](https://hydra.cc/) - 现代化的配置管理框架
+
+---
+
+如果这个项目对你有帮助，请考虑给个 ⭐ Star！
 
 #### 2. 表格操作问题
 

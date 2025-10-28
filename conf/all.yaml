@@ -22,7 +22,7 @@ search_config:
 feishu:
   enabled: true
   sync_threshold: 0.1
-  batch_size: 20
+  batch_size: 50
   chat_notification:
     enabled: true
     min_papers_threshold: 1

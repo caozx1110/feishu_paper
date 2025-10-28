@@ -115,6 +115,6 @@ exclude_keywords:
 # feishu:
 #   enabled: true # 启用飞书同步
 #   sync_threshold: 0.35 # 最低评分阈值
-#   batch_size: 20 # 批次处理大小
+#   batch_size: 50 # 批次处理大小
 
 description: 四足和人形机器人运动控制配置，专注于步态生成、平衡控制和地形适应 [精炼关键词结构，核心优先]

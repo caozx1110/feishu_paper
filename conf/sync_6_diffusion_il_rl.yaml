@@ -33,20 +33,20 @@ feishu:
 # ================================
 search:
   field: ["cs.AI", "cs.LG", "cs.RO", "eess.SY"] #
-  days: 7 # 搜索最近N天的论文 (1-365)
-  max_results: 300 # 最大获取论文数量 (建议100-1000)
+  days: 2 # 搜索最近N天的论文 (1-365)
+  max_results: 1000 # 最大获取论文数量 (建议100-1000)
   min_score: 0.15 # 最小相关性评分 (0.0-1.0)
 
   # 日期范围搜索（可选，启用时覆盖days参数）
   date_range:
     enabled: false # 是否启用精确日期范围搜索
-    start_date: "2024-01-01" # 开始日期 (YYYY-MM-DD)
-    end_date: "2024-12-31" # 结束日期 (YYYY-MM-DD)
+    start_date: "2025-10-01" # 开始日期 (YYYY-MM-DD)
+    end_date: "2025-10-24" # 结束日期 (YYYY-MM-DD)
 
   # 分批处理配置（避免API限制）
   batch_processing:
     enabled: true # 是否启用分批处理
-    max_days_per_batch: 7 # 每批处理的最大天数
+    max_days_per_batch: 1 # 每批处理的最大天数
     min_batch_interval: 1.0 # 批次间隔时间(秒)
     auto_split: true # 是否自动拆分大批次
     batch_overlap_days: 0 # 批次重叠天数
@@ -96,11 +96,11 @@ exclude_keywords:
 # 必须包含关键词配置（精确过滤）
 # ================================
 required_keywords:
-  enabled: false # 是否启用必须包含关键词过滤
+  enabled: true # 是否启用必须包含关键词过滤
   fuzzy_match: true # 是否启用模糊匹配
   similarity_threshold: 0.8 # 模糊匹配相似度阈值 (0.0-1.0)
   keywords: # 必须包含的关键词列表
-    - "diffusion OR flow OR score-based" # 逻辑OR: 包含任一关键词
+    - "diffusion OR flow matching OR score-based" # 逻辑OR: 包含任一关键词
     - "robot OR trajectory OR policy" # 逻辑AND: 必须同时包含
 
 # ================================

@@ -9,6 +9,7 @@ import arxiv
 import re
 import json
 import os
+import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Tuple, Optional
 from collections import defaultdict
@@ -39,7 +40,9 @@ class ArxivAPI:
         self.download_dir.mkdir(exist_ok=True)
 
         # 配置arxiv客户端（使用正确的方式）
-        self.client = arxiv.Client(page_size=100, delay_seconds=3.0, num_retries=3)
+        # 初始设置较小的page_size以避免空页面问题
+        self.initial_page_size = 500
+        self.client = arxiv.Client(page_size=self.initial_page_size, delay_seconds=1.0, num_retries=3)
 
     def search_papers(
         self,
@@ -52,7 +55,7 @@ class ArxivAPI:
         date_to: datetime = None,
     ) -> List[Dict[str, Any]]:
         """
-        搜索ArXiv论文
+        搜索ArXiv论文，支持动态调整page_size以解决空页面问题
 
         Args:
             query: 搜索查询字符串
@@ -69,19 +72,59 @@ class ArxivAPI:
         try:
             # 构建搜索查询
             search_query = self._build_search_query(query, categories, date_from, date_to)
-
             print(f"🔍 搜索查询: {search_query}")
 
             # 创建搜索对象
             search = arxiv.Search(query=search_query, max_results=max_results, sort_by=sort_by, sort_order=sort_order)
 
             papers = []
-            for result in self.client.results(search):
-                paper_info = self._parse_arxiv_result(result)
-                if paper_info:
-                    papers.append(paper_info)
+            empty_page_count = 0
+            max_empty_pages = 3  # 最大允许的连续空页面数
+            page_sizes_to_try = [500, 250, 100, 50, 10]  # 依次尝试的page_size
 
-            print(f"✅ 成功获取 {len(papers)} 篇论文")
+            for page_size in page_sizes_to_try:
+                try:
+                    # 重新配置客户端的page_size
+                    self.client = arxiv.Client(page_size=page_size, delay_seconds=3.0, num_retries=3)
+
+                    print(f"📄 使用page_size={page_size}进行搜索...")
+
+                    # 重新创建搜索对象
+                    search = arxiv.Search(
+                        query=search_query, max_results=max_results, sort_by=sort_by, sort_order=sort_order
+                    )
+
+                    papers = []
+                    empty_page_count = 0
+                    results_count = 0
+
+                    for result in self.client.results(search):
+                        paper_info = self._parse_arxiv_result(result)
+                        if paper_info:
+                            papers.append(paper_info)
+                            results_count += 1
+                            empty_page_count = 0  # 重置空页面计数
+
+                        # 检查是否遇到连续空页面
+                        if results_count == 0 and len(papers) == 0:
+                            empty_page_count += 1
+                            if empty_page_count >= max_empty_pages:
+                                print(f"⚠️  遇到{max_empty_pages}个连续空页面，尝试更小的page_size...")
+                                break
+
+                    # 如果成功获取到论文，跳出循环
+                    if papers:
+                        print(f"✅ 成功获取 {len(papers)} 篇论文 (page_size={page_size})")
+                        return papers
+
+                except Exception as e:
+                    print(f"❌ page_size={page_size}搜索失败: {e}")
+                    continue
+
+            # 如果所有page_size都失败了，返回空列表
+            if not papers:
+                print("⚠️  尝试所有page_size都未能获取论文，可能该日期范围内无相关论文")
+
             return papers
 
         except Exception as e:
@@ -153,7 +196,6 @@ class ArxivAPI:
         Returns:
             论文信息列表
         """
-        import time
 
         # 解析日期
         try:
@@ -166,6 +208,15 @@ class ArxivAPI:
         # 根据field_type设置默认分类
         if categories is None:
             categories = self._get_field_categories(field_type)
+        # 如果field_type本身就是一个列表并且categories为None，直接使用field_type
+        elif field_type and isinstance(field_type, list) and all(isinstance(item, str) for item in field_type):
+            # 检查是否都是有效的ArXiv分类格式
+            valid_prefixes = ("cs.", "stat.", "math.", "physics.", "eess.", "q-bio.", "quant-ph", "cond-mat")
+            if all(item.startswith(valid_prefixes) for item in field_type):
+                categories = field_type
+                print(f"📋 使用直接指定的分类列表: {categories}")
+            else:
+                categories = self._get_field_categories(field_type)
 
         # 检查是否需要分批处理
         total_days = (end_dt - start_dt).days + 1
@@ -219,7 +270,6 @@ class ArxivAPI:
         Returns:
             论文信息列表
         """
-        import time
 
         max_days_per_batch = batch_config.get("max_days_per_batch", 7)
         min_batch_interval = batch_config.get("min_batch_interval", 1.0)

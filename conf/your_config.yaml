@@ -32,21 +32,27 @@ feishu:
 # 论文搜索配置
 # ================================
 search:
-  field: "ai" # 搜索领域: ai, robotics, cv, nlp, all 等
-  days: 7 # 搜索最近N天的论文 (1-365)
-  max_results: 300 # 最大获取论文数量 (建议100-1000)
+  field:
+    "ai" # 搜索领域: ai, robotics, cv, nlp, all 等，支持以下格式：
+    # 单个: "ai", "robotics", "cv", "nlp"
+    # 并集: "ai+robotics", "ai|cv", "ai or nlp"
+    # 交集: "ai&robotics" (注意：ArXiv API限制，实际为并集)
+    # 直接分类: "cs.AI", ["cs.AI", "cs.LG"]
+    # 可用领域: all, ai, robotics, cv, nlp, physics, math, stat, eess, q-bio
+  days: 3 # 搜索最近N天的论文 (1-365， 每日更新可设为2-5)
+  max_results: 3000 # 最大获取论文数量 (建议300-10000，取决于你的搜索领域)
   min_score: 0.15 # 最小相关性评分 (0.0-1.0)
 
   # 日期范围搜索（可选，启用时覆盖days参数）
   date_range:
-    enabled: false # 是否启用精确日期范围搜索
+    enabled: false # 是否启用精确日期范围搜索，可用于大量检索，不适用于每日更新
     start_date: "2024-01-01" # 开始日期 (YYYY-MM-DD)
     end_date: "2024-12-31" # 结束日期 (YYYY-MM-DD)
 
   # 分批处理配置（避免API限制）
   batch_processing:
     enabled: true # 是否启用分批处理
-    max_days_per_batch: 7 # 每批处理的最大天数
+    max_days_per_batch: 7 # 每批处理的最大天数，取决于搜索邻域的论文更新速率
     min_batch_interval: 1.0 # 批次间隔时间(秒)
     auto_split: true # 是否自动拆分大批次
     batch_overlap_days: 0 # 批次重叠天数
@@ -87,12 +93,12 @@ exclude_keywords:
 # 必须包含关键词配置（精确过滤）
 # ================================
 required_keywords:
-  enabled: false # 是否启用必须包含关键词过滤
+  enabled: true # 是否启用必须包含关键词过滤
   fuzzy_match: true # 是否启用模糊匹配
   similarity_threshold: 0.8 # 模糊匹配相似度阈值 (0.0-1.0)
-  keywords: # 必须包含的关键词列表
-    - "machine learning OR deep learning" # 逻辑OR: 包含任一关键词
-    # - "computer AND vision"              # 逻辑AND: 必须同时包含
+  keywords: # 必须包含的关键词列表，注意：这需要谨慎考虑，不宜过于宽泛
+    - "machine learning OR deep learning OR robot learning" # 逻辑OR: 包含任一关键词
+    # - "computer OR vision"  # 列表之间是与的关系
 
 # ================================
 # 智能匹配配置（高级功能）

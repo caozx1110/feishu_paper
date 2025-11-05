@@ -1,4 +1,12 @@
-=
+# @package _global_
+#
+# 个人配置文件模板 - 新用户配置指南
+# 复制此文件并根据您的需求进行修改
+#
+# 配置文件命名规则：
+# - sync_[研究领域].yaml: 用于自动同步的配置文件
+# - test_[功能].yaml: 用于测试的配置文件
+# - [自定义名称].yaml: 其他用途的配置文件
 
 defaults:
   - default # 继承默认配置
@@ -18,87 +26,60 @@ user_profile:
 feishu:
   enabled: true # 是否启用飞书同步 (true/false)
   batch_size: 50 # 每批次同步的论文数量 (建议10-50)
-  sync_threshold: 0.4 # 同步阈值，高于此分数的论文才会同步
+  sync_threshold: 0.5 # 同步阈值，高于此分数的论文才会同步
 
 # ================================
 # 论文搜索配置
 # ================================
 search:
   field:
-    "ai+robotics" 
+    "robotics" # 搜索领域: ai, robotics, cv, nlp, all 等，支持以下格式：
+    # 单个: "ai", "robotics", "cv", "nlp"
+    # 并集: "ai+robotics", "ai|cv", "ai or nlp"
+    # 交集: "ai&robotics" (注意：ArXiv API限制，实际为并集)
+    # 直接分类: "cs.AI", ["cs.AI", "cs.LG"]
+    # 可用领域: all, ai, robotics, cv, nlp, physics, math, stat, eess, q-bio
+  days: 3 # 搜索最近N天的论文 (1-365， 每日更新可设为2-5)
+  max_results: 500 # 最大获取论文数量 (建议300-10000，取决于你的搜索领域)
+  min_score: 0.5 # 最小相关性评分 (0.0-1.0)
 
-  days: 7 # 搜索最近N天的论文 (1-365， 每日更新可设为2-5)
-  max_results: 300 # 最大获取论文数量 (建议300-10000，取决于你的搜索领域)
-  min_score: 0.35 # 最小相关性评分 (0.0-1.0)
 
-
+# 必须包含关键词配置
+required_keywords:
+  enabled: true # 启用必须包含关键词过滤
+  fuzzy_match: true # 启用模糊匹配
+  similarity_threshold: 0.8 # 模糊匹配相似度阈值
+  keywords: # 必须包含的关键词列表，论文必须同时包含所有项
+    - "robust navigation OR vision-and-language navigation OR VLN OR object navigation OR vision-and-language navigation OR vision language navigation"
+    - "zero-shot OR graph OR map-free OR SLAM OR semantic SLAM OR VLA OR foundation model OR memory"
+    
 # ================================
 # 关键词配置
 # ================================
 interest_keywords:
-  # 🎯 高权重核心关键词 
-  - "# 🎯 核心任务与范式"
+  # 高权重关键词 - 最重要的研究术语
+  - "# 🎯 高权重核心关键词"
   - "vision-and-language navigation"
   - "VLN"
   - "language-guided navigation"
-  - "embodied navigation"
-  - "instruction following"
   - "vision language action"
   - "VLA"
   - "vision-language-action"
-  - "multimodal embodied agent"
-  - "generalist robot model"
-
-  - "# 🗺️ 无地图图结构导航"
-  - "map-free navigation"
-  - "topological navigation"
   - "graph-based navigation"
+  - "zero-shot navigation"
+ 
+
+  # 中权重关键词 - 相关领域术语
+  - "# 🤖 中权重相关关键词"
   - "scene graph"
   - "spatial graph"
   - "relational reasoning"
   - "memory graph"
-  - "neural state machine"
-  - "implicit map"
-  - "latent spatial representation"
+  - "zero-shot generalization
 
-  - "# 🚀 零样本与泛化能力"
-  - "zero-shot navigation"
-  - "zero-shot generalization"
-  - "cross-environment transfer"
-  - "out-of-distribution navigation"
-  - "domain generalization"
-  - "sim-to-real"
-  - "unseen environment"
-  - "task generalization"
-  - "prompt-based navigation"
-  - "in-context learning"
-
-  - "# 🧠 VLA 基础模型驱动"
-  - "vision-language-action model"
-  - "foundation model for robotics"
-  - "large vision model"
-  - "LLM-based navigation"
-  - "multimodal LLM"
-  - "robotic transformer"
-  - "end-to-end embodied policy"
-  - "diffusion policy"
-  - "dual-system architecture"  
-
-  - "# 📍 SLAM 与感知融合"
-  - "visual SLAM"
-  - "semantic SLAM"
-  - "VLN-SLAM integration"
-  - "ego-motion estimation"
-  - "pose tracking"
-  - "depth estimation"
-  - "RGB-D navigation"
-  - "sensor fusion"
-  - "online mapping"
-  - "loop closure in VLN"
-
-  # 🤖 中权重相关关键词 —— 上下文支持性术语
-  - "# 🤖 相关技术"
-  - "reinforcement learning"
+  # 低权重关键词 - 技术方法术语
+  - "# 🔧 低权重技术关键词"
+ - "reinforcement learning"
   - "imitation learning"
   - "cross-modal alignment"
   - "spatial reasoning"
@@ -108,41 +89,19 @@ interest_keywords:
   - "transformer"
   - "memory network"
   - "hierarchical planning"
-
-  # 🔧 低权重技术关键词 —— 方法层面术语
-  - "# 🔧 方法与训练"
-  - "contrastive learning"
-  - "self-supervised learning"
-  - "curriculum learning"
-  - "data augmentation"
-  - "policy distillation"
-  - "model predictive control"
-  - "vectorized environment"
+  - "semantic SLAM"
 
 exclude_keywords:
-  # 明确排除非目标领域
+  # 排除不相关的研究领域
   - "medical"
   - "clinical"
   - "pharmaceutical"
   - "biological"
   - "healthcare"
   - "drug discovery"
-  - "image captioning"           
-  - "text-to-image"                     
-  - "drone flight control"     
-  - "pure localization"         
   - "object detection only"  
+  - "generation only"  
 
-# ================================
-# 必须包含关键词（精确过滤）
-# ================================
-required_keywords:
-  enabled: true
-  fuzzy_match: true
-  similarity_threshold: 0.8
-  keywords:
-    - "VLN OR vision-and-language navigation OR vision language action"
-    # 并且必须涉及至少一个关键技术方向
-    - "graph OR map-free OR zero-shot OR SLAM OR semantic SLAM OR VLA OR foundation model"
 
-description:VLN（Vision-and-Language Navigation）领域专用配置文件，聚焦于具身智能中的导航任务 [精炼关键词结构，核心优先]
+description: VLN（Vision-and-Language Navigation）领域专用配置文件，聚焦于具身智能中的导航任务 [精炼关键词结构，核心优先]
+  

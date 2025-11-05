@@ -43,6 +43,10 @@ search:
   max_results: 500 # 最大获取论文数量 (建议300-10000，取决于你的搜索领域)
   min_score: 0.5 # 最小相关性评分 (0.0-1.0)
 
+  date_range:
+    enabled: false # 是否启用精确日期范围搜索，可用于大量检索，不适用于每日更新
+    start_date: "2025-09-01" # 开始日期 (YYYY-MM-DD)
+    end_date: "2025-11-05" # 结束日期 (YYYY-MM-DD)
 
 # 必须包含关键词配置
 required_keywords:
@@ -52,7 +56,7 @@ required_keywords:
   keywords: # 必须包含的关键词列表，论文必须同时包含所有项
     - "robust navigation OR vision-and-language navigation OR VLN OR object navigation OR vision-and-language navigation OR vision language navigation"
     - "zero-shot OR graph OR map-free OR SLAM OR semantic SLAM OR VLA OR foundation model OR memory"
-    
+
 # ================================
 # 关键词配置
 # ================================
@@ -67,7 +71,6 @@ interest_keywords:
   - "vision-language-action"
   - "graph-based navigation"
   - "zero-shot navigation"
- 
 
   # 中权重关键词 - 相关领域术语
   - "# 🤖 中权重相关关键词"
@@ -75,11 +78,11 @@ interest_keywords:
   - "spatial graph"
   - "relational reasoning"
   - "memory graph"
-  - "zero-shot generalization
+  - "zero-shot generalization"
 
   # 低权重关键词 - 技术方法术语
   - "# 🔧 低权重技术关键词"
- - "reinforcement learning"
+  - "reinforcement learning"
   - "imitation learning"
   - "cross-modal alignment"
   - "spatial reasoning"
@@ -99,9 +102,7 @@ exclude_keywords:
   - "biological"
   - "healthcare"
   - "drug discovery"
-  - "object detection only"  
-  - "generation only"  
-
+  - "object detection only"
+  - "generation only"
 
 description: VLN（Vision-and-Language Navigation）领域专用配置文件，聚焦于具身智能中的导航任务 [精炼关键词结构，核心优先]
-  

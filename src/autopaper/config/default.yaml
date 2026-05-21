@@ -164,3 +164,57 @@ user_profile:
   research_area: "general"
 
 description: "ArXiv 论文采集工具默认配置"
+
+# 运行时配置：通常不需要修改，用户可在自己的配置中覆盖
+runtime:
+  network:
+    no_proxy: ${oc.env:NO_PROXY,"localhost,127.0.0.1,::1"}
+    proxy:
+      mode: ${oc.env:SYNC_USE_PROXY,"auto"} # auto, disabled, manual
+      url: ${oc.env:SYNC_PROXY_URL,""}
+      auto_host: ${oc.env:SYNC_PROXY_AUTO_HOST,"127.0.0.1"}
+      auto_port: ${oc.env:SYNC_PROXY_AUTO_PORT,7890}
+      probe_timeout_seconds: 0.2
+  healthcheck:
+    arxiv_url: ${oc.env:ARXIV_HEALTHCHECK_URL,"https://export.arxiv.org/api/query?search_query=all:robot&start=0&max_results=1"}
+    timeout_seconds: ${oc.env:ARXIV_HEALTHCHECK_MAX_TIME,20}
+  env:
+    feishu:
+      required:
+        - FEISHU_APP_ID
+        - FEISHU_APP_SECRET
+        - FEISHU_BITABLE_APP_TOKEN
+      token_any_of:
+        - FEISHU_USER_ACCESS_TOKEN
+        - FEISHU_TENANT_ACCESS_TOKEN
+      placeholder_markers:
+        - xxxx
+        - xxxxxxxx
+
+# ArXiv API 客户端配置
+arxiv:
+  request_timeout: ${oc.env:ARXIV_REQUEST_TIMEOUT,"5,30"}
+  initial_page_size: 500
+  page_sizes: [500, 250, 100, 50, 10]
+  initial_delay_seconds: 1.0
+  retry_delay_seconds: 3.0
+  num_retries: 3
+  max_empty_pages: 3
+  field_categories:
+    ai: ["cs.AI", "cs.LG", "stat.ML"]
+    robotics: ["cs.RO"]
+    cv: ["cs.CV", "eess.IV"]
+    nlp: ["cs.CL"]
+    physics: ["physics.comp-ph", "cond-mat", "quant-ph"]
+    math: ["math.OC", "math.ST", "math.NA"]
+    stat: ["stat.ML", "stat.ME", "stat.AP"]
+    eess: ["eess.IV", "eess.SP", "eess.AS"]
+    q-bio: ["q-bio.QM", "q-bio.GN", "q-bio.MN"]
+    all: ["cs.AI", "cs.LG", "cs.RO", "cs.CV", "cs.CL", "cs.CR", "cs.DC", "cs.DS", "cs.HC", "cs.IR"]
+  smoke_test:
+    query: "robot"
+    field: "robotics"
+    categories: ["cs.RO"]
+    max_results: 2
+    days: 7
+    timeout_seconds: 30

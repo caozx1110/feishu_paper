@@ -9,31 +9,31 @@ __version__ = "0.1.0"
 
 
 def find_sync_configs(*args, **kwargs):
-    from .arxiv_hydra import find_sync_configs as _find_sync_configs
+    from .configuration import find_sync_configs as _find_sync_configs
 
     return _find_sync_configs(*args, **kwargs)
 
 
 def load_config(*args, **kwargs):
-    from .arxiv_hydra import load_config as _load_config
+    from .configuration import load_config as _load_config
 
     return _load_config(*args, **kwargs)
 
 
 def process_all_configs(*args, **kwargs):
-    from .arxiv_hydra import process_all_configs as _process_all_configs
+    from .sync import process_all_configs as _process_all_configs
 
     return _process_all_configs(*args, **kwargs)
 
 
 def process_single_config(*args, **kwargs):
-    from .arxiv_hydra import process_single_config as _process_single_config
+    from .sync import process_single_config as _process_single_config
 
     return _process_single_config(*args, **kwargs)
 
 
 def get_default_config_dir():
-    from .arxiv_hydra import DEFAULT_CONFIG_DIR
+    from .configuration import DEFAULT_CONFIG_DIR
 
     return DEFAULT_CONFIG_DIR
 

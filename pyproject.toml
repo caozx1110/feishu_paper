@@ -44,6 +44,17 @@ dev = [
     "ruff>=0.4.0",
 ]
 
+[dependency-groups]
+dev = [
+    "build>=1.0.0",
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.4.0",
+]
+
+[tool.uv]
+package = true
+
 [project.scripts]
 autopaper = "autopaper.cli:main"
 
@@ -51,11 +62,14 @@ autopaper = "autopaper.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-autopaper = ["config/*.yaml", "scripts/*"]
+autopaper = ["config/*.yaml", "scripts/*", "templates/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+markers = [
+    "network: live arXiv tests that require internet connectivity",
+]
 
 [tool.ruff]
 line-length = 120

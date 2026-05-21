@@ -12,6 +12,7 @@ import os
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from dotenv import load_dotenv
+from .configuration.runtime import FeishuEnvPolicy
 from .feishu_bitable_connector import FeishuBitableConnector
 
 
@@ -32,23 +33,11 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
         print("ℹ️ 飞书同步已禁用")
         return False
 
-    # 检查环境变量
-    required_vars = ['FEISHU_APP_ID', 'FEISHU_APP_SECRET', 'FEISHU_BITABLE_APP_TOKEN']
+    env_policy = FeishuEnvPolicy.from_config(cfg)
+    missing_vars = [var for var in env_policy.required if not _has_real_env_value(var, env_policy)]
+    has_token = any(_has_real_env_value(var, env_policy) for var in env_policy.token_any_of)
 
-    missing_vars = []
-    for var in required_vars:
-        if not os.getenv(var):
-            missing_vars.append(var)
-
-    # 检查访问令牌
-    has_user_token = bool(os.getenv('FEISHU_USER_ACCESS_TOKEN')) and 'xxxx' not in os.getenv(
-        'FEISHU_USER_ACCESS_TOKEN', ''
-    )
-    has_tenant_token = bool(os.getenv('FEISHU_TENANT_ACCESS_TOKEN')) and 'xxxx' not in os.getenv(
-        'FEISHU_TENANT_ACCESS_TOKEN', ''
-    )
-
-    if missing_vars or (not has_user_token and not has_tenant_token):
+    if missing_vars or not has_token:
         print("❌ 飞书配置不完整，请先检查 .env 或运行 autopaper health")
         return False
 
@@ -443,3 +432,8 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
     except Exception as e:
         print(f"❌ 飞书同步失败: {e}")
         return 0
+
+
+def _has_real_env_value(name: str, env_policy: FeishuEnvPolicy) -> bool:
+    value = os.getenv(name, "")
+    return bool(value) and not any(marker in value for marker in env_policy.placeholder_markers)

@@ -4,7 +4,7 @@ import yaml
 
 import autopaper
 from autopaper.arxiv_core import ArxivAPI
-from autopaper.arxiv_hydra import DEFAULT_CONFIG_DIR, find_sync_configs, load_config, normalize_config
+from autopaper.configuration import DEFAULT_CONFIG_DIR, find_sync_configs, load_config, normalize_config
 from autopaper.cli import build_parser, main
 
 
@@ -52,6 +52,7 @@ def test_cli_parser_has_core_commands():
     assert "sync" in help_text
     assert "health" in help_text
     assert "init" in help_text
+    assert "smoke-search" in help_text
 
 
 def test_cli_init_copies_configs(tmp_path):

@@ -10,7 +10,6 @@
 #   AUTOPAPER_CONFIG_DIR=/path/to/project/conf
 #   SYNC_TIMEOUT_SECONDS=7200
 #   ARXIV_REQUEST_TIMEOUT=5,30
-#   SYNC_PROXY_URL=http://127.0.0.1:7890
 
 set -u
 
@@ -34,29 +33,6 @@ if ! flock -n 9; then
 fi
 
 SYNC_TIMEOUT_SECONDS="${SYNC_TIMEOUT_SECONDS:-7200}"
-export ARXIV_REQUEST_TIMEOUT="${ARXIV_REQUEST_TIMEOUT:-5,30}"
-ARXIV_HEALTHCHECK_URL="${ARXIV_HEALTHCHECK_URL:-https://export.arxiv.org/api/query?search_query=all:robot&start=0&max_results=1}"
-ARXIV_HEALTHCHECK_MAX_TIME="${ARXIV_HEALTHCHECK_MAX_TIME:-20}"
-SYNC_USE_PROXY="${SYNC_USE_PROXY:-auto}"
-SYNC_PROXY_URL="${SYNC_PROXY_URL:-}"
-
-if [ -z "${http_proxy:-}" ] && [ -z "${https_proxy:-}" ] && [ -z "${HTTP_PROXY:-}" ] && [ -z "${HTTPS_PROXY:-}" ]; then
-    if [ -n "$SYNC_PROXY_URL" ]; then
-        export http_proxy="$SYNC_PROXY_URL"
-        export https_proxy="$SYNC_PROXY_URL"
-    elif [ "$SYNC_USE_PROXY" = "auto" ] && (echo > /dev/tcp/127.0.0.1/7890) >/dev/null 2>&1; then
-        export http_proxy="http://127.0.0.1:7890"
-        export https_proxy="http://127.0.0.1:7890"
-    fi
-fi
-
-if [ -n "${https_proxy:-}" ]; then
-    export HTTPS_PROXY="$https_proxy"
-fi
-if [ -n "${http_proxy:-}" ]; then
-    export HTTP_PROXY="$http_proxy"
-fi
-export no_proxy="${no_proxy:-localhost,127.0.0.1,::1}"
 
 {
     echo "==========================================="
@@ -64,8 +40,6 @@ export no_proxy="${no_proxy:-localhost,127.0.0.1,::1}"
     echo "📂 项目目录: $PROJECT_DIR"
     echo "📄 配置目录: $CONFIG_DIR"
     echo "⏱️  总超时: ${SYNC_TIMEOUT_SECONDS} 秒"
-    echo "🌐 ArXiv请求超时: ${ARXIV_REQUEST_TIMEOUT} 秒"
-    echo "🧭 HTTPS代理: ${https_proxy:-未设置}"
     echo "==========================================="
 } >> "$LOG_FILE"
 
@@ -106,15 +80,14 @@ if ! python3 -m autopaper --version >> "$LOG_FILE" 2>&1; then
     exit 1
 fi
 
-if command -v curl >/dev/null 2>&1; then
-    echo "🌐 检查ArXiv API连通性..." >> "$LOG_FILE"
-    if ! curl -fsS --connect-timeout 5 --max-time "$ARXIV_HEALTHCHECK_MAX_TIME" "$ARXIV_HEALTHCHECK_URL" >/dev/null 2>&1; then
-        echo "❌ ArXiv API连接失败，跳过本次同步: $ARXIV_HEALTHCHECK_URL" >> "$LOG_FILE"
-        exit 1
-    fi
-    echo "✅ ArXiv API连通性正常" >> "$LOG_FILE"
-else
-    echo "⚠️  未找到curl，跳过ArXiv API连通性预检" >> "$LOG_FILE"
+echo "🌐 检查AutoPaper运行环境..." >> "$LOG_FILE"
+HEALTH_CMD=(python3 -m autopaper health)
+if [ -f "$CONFIG_DIR/default.yaml" ]; then
+    HEALTH_CMD+=(--config-dir "$CONFIG_DIR")
+fi
+if ! "${HEALTH_CMD[@]}" >> "$LOG_FILE" 2>&1; then
+    echo "❌ AutoPaper健康检查失败，跳过本次同步" >> "$LOG_FILE"
+    exit 1
 fi
 
 SYNC_CMD=(python3 -m autopaper sync --config all)

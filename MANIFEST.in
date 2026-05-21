@@ -4,3 +4,4 @@ include requirements.txt
 include .env.template
 recursive-include src/autopaper/config *.yaml
 recursive-include src/autopaper/scripts *
+recursive-include src/autopaper/templates *

@@ -1,79 +1,56 @@
 # AutoPaper
 
-AutoPaper collects recent arXiv papers, ranks them with configurable keyword rules, and syncs selected papers into Feishu Bitable. This branch packages the original script-based repository as a reusable Python package while keeping the master branch sync behavior and YAML configs.
+AutoPaper 是一个可复用的 arXiv 文献采集、关键词排序、飞书多维表格同步工具。本分支将原来偏脚本式的仓库整理为标准 Python package，并保留 master 分支已有的搜索、排序、飞书同步、批量配置和定时任务能力。
 
-## Features
+## 适合谁
 
-- arXiv search by recent days or explicit date range.
-- Field/category presets for AI, robotics, CV, NLP, physics, math, statistics, EESS, and biology.
-- Keyword ranking with exclude terms, required terms, fuzzy matching, and optional advanced scoring.
-- Feishu Bitable sync with per-domain tables, duplicate detection, view management, and optional chat notifications.
-- Batch sync across all `sync_*.yaml` configs.
-- CLI commands for initialization, health checks, config listing, token fetching, and sync.
+- 希望每天按多个研究方向自动同步 arXiv 论文的团队。
+- 希望复用 `ArxivAPI` / `PaperRanker` 做二次开发的用户。
+- 希望用 YAML 管理搜索范围、关键词、Feishu、代理、超时和 smoke test 的用户。
 
-## Installation
+## 包结构
 
-For local development:
+```text
+src/autopaper/
+  configuration/   # 配置加载、默认配置、网络代理、运行时设置
+  core/            # ArXiv API 工厂、搜索服务、排序接口
+  sync/            # 单配置/批量同步 orchestration
+  cli/             # autopaper 命令行入口
+  config/          # 随包分发的默认 YAML 配置和 sync 模板
+  scripts/         # 可复制到用户项目的 cron 辅助脚本
+```
+
+旧的 `python -m autopaper.arxiv_hydra` 仍保留为兼容入口；新项目优先使用 `autopaper` CLI。
+
+## 安装
+
+推荐使用 `uv`：
 
 ```bash
-git checkout dev/pkg
+git checkout refactor/industrial-package
+uv sync --group dev
+uv run autopaper --help
+```
+
+也可以使用 pip：
+
+```bash
 python -m pip install -e ".[dev]"
+autopaper --help
 ```
 
-For runtime-only use from a checked out source tree:
+## 新项目完整使用步骤
 
-```bash
-python -m pip install -e .
-```
-
-## Quick Start
-
-Create a project directory with editable configs:
+1. 初始化工作目录：
 
 ```bash
 mkdir my-autopaper
 cd my-autopaper
-autopaper init --with-scripts
+uv run --project /home/ubuntu/ws/feishu_paper_pkg autopaper init --with-scripts
 cp .env.template .env
 ```
 
-Edit `.env` with Feishu credentials, then run:
-
-```bash
-autopaper health --config-dir ./conf
-autopaper list-configs --config-dir ./conf
-autopaper sync --config all --config-dir ./conf
-```
-
-Run one config:
-
-```bash
-autopaper sync --config sync_7_vln --config-dir ./conf
-```
-
-The packaged default configs can also be used directly:
-
-```bash
-autopaper sync --config all
-```
-
-## Configuration
-
-`autopaper init` copies the packaged YAML files into `./conf`. Files named `sync_*.yaml` participate in batch sync.
-
-Common settings:
-
-- `search.days`: recent-day search window when `date_range.enabled` is false.
-- `search.date_range`: explicit `YYYY-MM-DD` range search for backfills.
-- `search.batch_processing`: split large ranges to avoid arXiv API failures.
-- `interest_keywords`: positive ranking keywords.
-- `exclude_keywords`: negative filters.
-- `required_keywords`: hard requirement filters with optional fuzzy matching.
-- `feishu.sync_threshold`: minimum score required before a paper is synced.
-
-Sensitive values are read from environment variables through `.env`.
-
-Required Feishu variables:
+2. 编辑 `.env`，至少填写：
 
 ```bash
 FEISHU_APP_ID=...
@@ -82,11 +59,33 @@ FEISHU_BITABLE_APP_TOKEN=...
 FEISHU_TENANT_ACCESS_TOKEN=...
 ```
 
-`FEISHU_USER_ACCESS_TOKEN` can be used instead of `FEISHU_TENANT_ACCESS_TOKEN`, but tenant tokens are usually better for automation.
+`FEISHU_USER_ACCESS_TOKEN` 也可以使用，但自动化任务推荐 `FEISHU_TENANT_ACCESS_TOKEN`。
 
-## Scheduling
+3. 检查环境：
 
-After `autopaper init --with-scripts`, install the daily cron job:
+```bash
+uv run --project /home/ubuntu/ws/feishu_paper_pkg autopaper health --config-dir ./conf
+```
+
+4. 查看可用同步配置：
+
+```bash
+uv run --project /home/ubuntu/ws/feishu_paper_pkg autopaper list-configs --config-dir ./conf
+```
+
+5. 手动同步全部配置：
+
+```bash
+uv run --project /home/ubuntu/ws/feishu_paper_pkg autopaper sync --config all --config-dir ./conf
+```
+
+6. 手动同步单个方向：
+
+```bash
+uv run --project /home/ubuntu/ws/feishu_paper_pkg autopaper sync --config sync_7_vln --config-dir ./conf
+```
+
+7. 安装每日定时任务：
 
 ```bash
 chmod +x scripts/*.sh
@@ -94,51 +93,47 @@ scripts/setup_daily_sync.sh install
 scripts/setup_daily_sync.sh status
 ```
 
-The default schedule is daily at 10:00 in the system timezone. Override it before installing:
+## 配置原则
+
+AutoPaper 的可变行为都应从 YAML 配置或环境变量进入，不在业务入口写死：
+
+- `search`: 搜索领域、时间范围、最大结果数、分批处理。
+- `interest_keywords` / `exclude_keywords` / `required_keywords`: 排序和过滤规则。
+- `arxiv`: API 超时、page size 退避、分类映射、联网 smoke test 参数。
+- `runtime.network`: 代理、healthcheck、no_proxy。
+- `runtime.env.feishu`: health 检查需要的环境变量名称。
+- `feishu`: 多维表格、视图、群聊通知和同步阈值。
+
+默认值在 `src/autopaper/config/default.yaml`。用户项目通过 `autopaper init` 复制到 `./conf/default.yaml` 后可以覆盖。
+
+## 联网 smoke test
+
+命令行快速测试：
 
 ```bash
-AUTOPAPER_CRON_SCHEDULE="0 10 * * *" scripts/setup_daily_sync.sh install
+uv run autopaper smoke-search --max-results 1
 ```
 
-The daily script supports network tuning:
+pytest 联网测试默认跳过，需要显式开启：
 
 ```bash
-ARXIV_REQUEST_TIMEOUT=5,30
-SYNC_TIMEOUT_SECONDS=7200
-SYNC_PROXY_URL=http://127.0.0.1:7890
+AUTOPAPER_RUN_NETWORK_TESTS=1 \
+AUTOPAPER_ENV_FILE=/home/ubuntu/ws/feishu_paper/.env \
+uv run pytest tests/smoke/test_network_smoke.py -q
 ```
 
-Logs are written to `logs/daily_sync_YYYYMMDD.log`.
+该测试会同时调用 package 版本和 master 分支的 `arxiv_core.py`，并比较返回的第一篇论文 ID 与标题，确保核心搜索结果一致。
 
-## Python API
-
-```python
-from autopaper import ArxivAPI, PaperRanker
-
-api = ArxivAPI()
-papers = api.get_recent_papers(days=3, field_type="robotics", max_results=100)
-
-ranker = PaperRanker()
-ranked, excluded, stats = ranker.filter_and_rank_papers(
-    papers,
-    interest_keywords=["vision-language navigation", "robotics"],
-    exclude_keywords=["medical"],
-    min_score=0.2,
-)
-```
-
-## Compatibility
-
-The original Hydra entry point is still available for advanced overrides:
+## 开发验证
 
 ```bash
-python -m autopaper.arxiv_hydra --config-name=default search.field=robotics
-python -m autopaper.arxiv_hydra --config-name=all
+uv sync --group dev
+uv run pytest
+AUTOPAPER_RUN_NETWORK_TESTS=1 AUTOPAPER_ENV_FILE=/home/ubuntu/ws/feishu_paper/.env uv run pytest tests/smoke/test_network_smoke.py -q
+uv run python -m build
 ```
 
-For normal package use, prefer the `autopaper` CLI because it supports external config directories without relying on the repository root.
-
-## Development
+pip 等价命令：
 
 ```bash
 python -m pip install -e ".[dev]"
@@ -146,11 +141,33 @@ python -m pytest
 python -m build
 ```
 
-Basic non-network tests cover package imports, bundled configs, CLI parsing, initialization, and arXiv query construction.
+## Python API
 
-## Troubleshooting
+```python
+from autopaper.configuration import load_config, normalize_config
+from autopaper.core import SearchService, create_arxiv_api
 
-- Run `autopaper health --config-dir ./conf` first; it checks imports, configs, Feishu env variables, and arXiv connectivity.
-- If arXiv connectivity is slow, set `ARXIV_REQUEST_TIMEOUT=5,30` or configure `HTTP_PROXY` / `HTTPS_PROXY`.
-- If Feishu sync fails, verify the app token, app credentials, and access token in `.env`.
-- For automated jobs, prefer `FEISHU_TENANT_ACCESS_TOKEN`; refresh it with `autopaper get-token`.
+cfg = normalize_config(load_config("sync_7_vln"))
+papers = SearchService(create_arxiv_api(cfg)).fetch(cfg)
+```
+
+```python
+from autopaper import ArxivAPI, PaperRanker
+
+api = ArxivAPI()
+papers = api.search_papers(query="robot", categories=["cs.RO"], max_results=3)
+ranker = PaperRanker()
+ranked, excluded, stats = ranker.filter_and_rank_papers(
+    papers,
+    interest_keywords=["navigation", "robot"],
+    exclude_keywords=["medical"],
+    min_score=0.1,
+)
+```
+
+## 排障
+
+- arXiv 连接超时：检查 `runtime.network.proxy` 或设置 `SYNC_PROXY_URL`。
+- arXiv 429：缩小 `search.days`、降低 `search.max_results`，或启用更小的分批窗口。
+- 飞书 token 过期：运行 `autopaper get-token` 或更新 `.env`。
+- 定时任务无日志：检查 `scripts/setup_daily_sync.sh status` 和 `logs/daily_sync_YYYYMMDD.log`。

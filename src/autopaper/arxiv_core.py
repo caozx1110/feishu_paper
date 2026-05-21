@@ -10,13 +10,16 @@ import re
 import json
 import os
 import time
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Tuple, Optional
+from typing import Dict, List, Any, Tuple, Optional, Mapping, Sequence
 from collections import defaultdict
 import math
 import requests
 from pathlib import Path
 import hashlib
+
+from .configuration.runtime import ArxivRuntimeSettings
 
 # 优先使用 rapidfuzz，如果不可用则回退到 difflib
 try:
@@ -30,19 +33,90 @@ except ImportError:
     print("⚠️  rapidfuzz 不可用，使用 difflib 作为备用方案")
 
 
+@dataclass(frozen=True)
+class ArxivClientConfig:
+    """Runtime knobs for the arXiv client.
+
+    Normal package execution passes this from ``default.yaml``. The defaults
+    below keep the public Python API usable when the class is constructed
+    directly in notebooks or third-party code.
+    """
+
+    request_timeout: Any = (5.0, 30.0)
+    initial_page_size: int = 500
+    page_sizes: Tuple[int, ...] = (500, 250, 100, 50, 10)
+    initial_delay_seconds: float = 1.0
+    retry_delay_seconds: float = 3.0
+    num_retries: int = 3
+    max_empty_pages: int = 3
+    field_categories: Dict[str, List[str]] = field(
+        default_factory=lambda: {
+            "ai": ["cs.AI", "cs.LG", "stat.ML"],
+            "robotics": ["cs.RO"],
+            "cv": ["cs.CV", "eess.IV"],
+            "nlp": ["cs.CL"],
+            "physics": ["physics.comp-ph", "cond-mat", "quant-ph"],
+            "math": ["math.OC", "math.ST", "math.NA"],
+            "stat": ["stat.ML", "stat.ME", "stat.AP"],
+            "eess": ["eess.IV", "eess.SP", "eess.AS"],
+            "q-bio": ["q-bio.QM", "q-bio.GN", "q-bio.MN"],
+            "all": ["cs.AI", "cs.LG", "cs.RO", "cs.CV", "cs.CL", "cs.CR", "cs.DC", "cs.DS", "cs.HC", "cs.IR"],
+        }
+    )
+
+    @classmethod
+    def from_runtime_settings(cls, settings: ArxivRuntimeSettings) -> "ArxivClientConfig":
+        return cls(
+            request_timeout=settings.request_timeout,
+            initial_page_size=settings.initial_page_size,
+            page_sizes=tuple(settings.page_sizes),
+            initial_delay_seconds=settings.initial_delay_seconds,
+            retry_delay_seconds=settings.retry_delay_seconds,
+            num_retries=settings.num_retries,
+            max_empty_pages=settings.max_empty_pages,
+            field_categories=dict(settings.field_categories) or cls().field_categories,
+        )
+
+    @classmethod
+    def from_mapping(cls, config: Mapping[str, Any]) -> "ArxivClientConfig":
+        settings = ArxivRuntimeSettings.from_config({"arxiv": config})
+        return cls.from_runtime_settings(settings)
+
+
 class ArxivAPI:
     """ArXiv API 交互类 - 使用官方arxiv库"""
 
-    def __init__(self, timeout: Any = (5, 30), download_dir: str = "downloads"):
+    def __init__(
+        self,
+        timeout: Any = None,
+        download_dir: str = "downloads",
+        client_config: ArxivClientConfig | ArxivRuntimeSettings | Mapping[str, Any] | None = None,
+    ):
         """初始化ArXiv API客户端"""
+        self.config = self._coerce_client_config(client_config)
+        timeout = timeout if timeout is not None else self.config.request_timeout
         self.timeout = self._resolve_timeout(timeout)
         self.download_dir = Path(download_dir)
         self.download_dir.mkdir(exist_ok=True)
 
-        # 配置arxiv客户端（使用正确的方式）
-        # 初始设置较小的page_size以避免空页面问题
-        self.initial_page_size = 500
-        self.client = self._create_client(page_size=self.initial_page_size, delay_seconds=1.0)
+        self.initial_page_size = self.config.initial_page_size
+        self.field_mappings = self.config.field_categories
+        self.client = self._create_client(
+            page_size=self.initial_page_size,
+            delay_seconds=self.config.initial_delay_seconds,
+        )
+
+    @staticmethod
+    def _coerce_client_config(
+        client_config: ArxivClientConfig | ArxivRuntimeSettings | Mapping[str, Any] | None,
+    ) -> ArxivClientConfig:
+        if client_config is None:
+            return ArxivClientConfig()
+        if isinstance(client_config, ArxivClientConfig):
+            return client_config
+        if isinstance(client_config, ArxivRuntimeSettings):
+            return ArxivClientConfig.from_runtime_settings(client_config)
+        return ArxivClientConfig.from_mapping(client_config)
 
     @staticmethod
     def _resolve_timeout(default_timeout: Any) -> Any:
@@ -75,7 +149,7 @@ class ArxivAPI:
         return timeout
 
     def _create_client(self, page_size: int, delay_seconds: float) -> arxiv.Client:
-        client = arxiv.Client(page_size=page_size, delay_seconds=delay_seconds, num_retries=3)
+        client = arxiv.Client(page_size=page_size, delay_seconds=delay_seconds, num_retries=self.config.num_retries)
         original_get = client._session.get
         request_timeout = self.timeout
 
@@ -121,13 +195,11 @@ class ArxivAPI:
 
             papers = []
             empty_page_count = 0
-            max_empty_pages = 3  # 最大允许的连续空页面数
-            page_sizes_to_try = [500, 250, 100, 50, 10]  # 依次尝试的page_size
 
-            for page_size in page_sizes_to_try:
+            for page_size in self.config.page_sizes:
                 try:
                     # 重新配置客户端的page_size
-                    self.client = self._create_client(page_size=page_size, delay_seconds=3.0)
+                    self.client = self._create_client(page_size=page_size, delay_seconds=self.config.retry_delay_seconds)
 
                     print(f"📄 使用page_size={page_size}进行搜索...")
 
@@ -150,8 +222,8 @@ class ArxivAPI:
                         # 检查是否遇到连续空页面
                         if results_count == 0 and len(papers) == 0:
                             empty_page_count += 1
-                            if empty_page_count >= max_empty_pages:
-                                print(f"⚠️  遇到{max_empty_pages}个连续空页面，尝试更小的page_size...")
+                            if empty_page_count >= self.config.max_empty_pages:
+                                print(f"⚠️  遇到{self.config.max_empty_pages}个连续空页面，尝试更小的page_size...")
                                 break
 
                     # 如果成功获取到论文，跳出循环
@@ -539,19 +611,7 @@ class ArxivAPI:
         - 交集操作: "ai&robotics" (目前ArXiv API不直接支持，返回并集)
         - 直接分类: "cs.AI" 或 ["cs.AI", "cs.LG"]
         """
-        # 基础领域映射
-        field_mappings = {
-            "ai": ["cs.AI", "cs.LG", "stat.ML"],
-            "robotics": ["cs.RO"],
-            "cv": ["cs.CV", "eess.IV"],
-            "nlp": ["cs.CL"],
-            "physics": ["physics.comp-ph", "cond-mat", "quant-ph"],
-            "math": ["math.OC", "math.ST", "math.NA"],
-            "stat": ["stat.ML", "stat.ME", "stat.AP"],
-            "eess": ["eess.IV", "eess.SP", "eess.AS"],
-            "q-bio": ["q-bio.QM", "q-bio.GN", "q-bio.MN"],
-            "all": ["cs.AI", "cs.LG", "cs.RO", "cs.CV", "cs.CL", "cs.CR", "cs.DC", "cs.DS", "cs.HC", "cs.IR"],
-        }
+        field_mappings = self.field_mappings
 
         # 如果是列表，处理列表中的每个元素
         if isinstance(field_type, list):
@@ -565,7 +625,7 @@ class ArxivAPI:
             return self._parse_field_string(field_type, field_mappings)
 
         # 默认返回all
-        return field_mappings["all"]
+        return field_mappings.get("all", [])
 
     def _parse_field_string(self, field_str: str, field_mappings: dict) -> List[str]:
         """解析字段字符串，支持运算符"""

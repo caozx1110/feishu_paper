@@ -23,5 +23,6 @@ MANIFEST
 logs/
 *.log
 .conda/
+.venv/
 outputs/
 backup/

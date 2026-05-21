@@ -1,0 +1,6 @@
+include README.md
+include LICENSE
+include requirements.txt
+include .env.template
+recursive-include src/autopaper/config *.yaml
+recursive-include src/autopaper/scripts *

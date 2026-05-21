@@ -1,0 +1,7 @@
+# Example AutoPaper cron entry.
+#
+# Prefer installing with:
+#   scripts/setup_daily_sync.sh install
+#
+# Manual template:
+#   0 10 * * * AUTOPAPER_PROJECT_DIR="/path/to/your/project" "/path/to/your/project/scripts/daily_arxiv_sync.sh" # autopaper daily_arxiv_sync

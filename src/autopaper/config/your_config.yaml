@@ -1,0 +1,158 @@
+# @package _global_
+#
+# 个人配置文件模板 - 新用户配置指南
+# 复制此文件并根据您的需求进行修改
+#
+# 配置文件命名规则：
+# - sync_[研究领域].yaml: 用于自动同步的配置文件
+# - test_[功能].yaml: 用于测试的配置文件
+# - [自定义名称].yaml: 其他用途的配置文件
+
+defaults:
+  - default # 继承默认配置
+  - _self_ # 当前配置优先级最高
+
+# ================================
+# 用户信息配置
+# ================================
+user_profile:
+  name: "您的研究员名称" # 显示在飞书表格中的用户名
+  description: "研究方向描述" # 详细的研究方向说明
+  research_area: "your_field" # 研究领域标识符（用于文件名等）
+
+# ================================
+# 飞书同步配置
+# ================================
+feishu:
+  enabled: true # 是否启用飞书同步 (true/false)
+  batch_size: 50 # 每批次同步的论文数量 (建议10-50)
+  sync_threshold: 0.3 # 同步阈值，高于此分数的论文才会同步
+
+# ================================
+# 论文搜索配置
+# ================================
+search:
+  field:
+    "ai" # 搜索领域: ai, robotics, cv, nlp, all 等，支持以下格式：
+    # 单个: "ai", "robotics", "cv", "nlp"
+    # 并集: "ai+robotics", "ai|cv", "ai or nlp"
+    # 交集: "ai&robotics" (注意：ArXiv API限制，实际为并集)
+    # 直接分类: "cs.AI", ["cs.AI", "cs.LG"]
+    # 可用领域: all, ai, robotics, cv, nlp, physics, math, stat, eess, q-bio
+  days: 3 # 搜索最近N天的论文 (1-365， 每日更新可设为2-5)
+  max_results: 3000 # 最大获取论文数量 (建议300-10000，取决于你的搜索领域)
+  min_score: 0.15 # 最小相关性评分 (0.0-1.0)
+
+  # 日期范围搜索（可选，启用时覆盖days参数）
+  date_range:
+    enabled: false # 是否启用精确日期范围搜索，可用于大量检索，不适用于每日更新
+    start_date: "2024-01-01" # 开始日期 (YYYY-MM-DD)
+    end_date: "2024-12-31" # 结束日期 (YYYY-MM-DD)
+
+  # 分批处理配置（避免API限制）
+  batch_processing:
+    enabled: true # 是否启用分批处理
+    max_days_per_batch: 7 # 每批处理的最大天数，取决于搜索邻域的论文更新速率
+    min_batch_interval: 1.0 # 批次间隔时间(秒)
+    auto_split: true # 是否自动拆分大批次
+    batch_overlap_days: 0 # 批次重叠天数
+
+# ================================
+# 关键词配置
+# ================================
+interest_keywords:
+  # 高权重关键词 - 最重要的研究术语
+  - "# 🎯 高权重核心关键词"
+  - "machine learning"
+  - "deep learning"
+  - "artificial intelligence"
+  - "neural networks"
+
+  # 中权重关键词 - 相关领域术语
+  - "# 🤖 中权重相关关键词"
+  - "computer vision"
+  - "natural language processing"
+  - "data science"
+  - "algorithm"
+
+  # 低权重关键词 - 技术方法术语
+  - "# 🔧 低权重技术关键词"
+  - "optimization"
+  - "classification"
+  - "regression"
+  - "clustering"
+
+exclude_keywords:
+  # 排除不相关的研究领域
+  - "medical"
+  - "clinical"
+  - "pharmaceutical"
+  - "biological"
+
+# ================================
+# 必须包含关键词配置（精确过滤）
+# ================================
+required_keywords:
+  enabled: true # 是否启用必须包含关键词过滤
+  fuzzy_match: true # 是否启用模糊匹配
+  similarity_threshold: 0.8 # 模糊匹配相似度阈值 (0.0-1.0)
+  keywords: # 必须包含的关键词列表，注意：这需要谨慎考虑，不宜过于宽泛
+    - "machine learning OR deep learning OR robot learning" # 逻辑OR: 包含任一关键词
+    # - "computer OR vision"  # 列表之间是与的关系
+
+# ================================
+# 智能匹配配置（高级功能）
+# ================================
+intelligent_matching:
+  enabled: false # 是否启用AI智能匹配
+  score_weights:
+    base: 1.0 # 基础匹配权重
+    semantic: 0.3 # 语义理解权重
+    author: 0.2 # 作者分析权重
+
+# ================================
+# 显示和输出配置
+# ================================
+display:
+  show_ranking: true # 是否显示论文排序
+  show_scores: true # 是否显示相关性评分
+  show_breakdown: false # 是否显示详细评分分解
+  stats: true # 是否显示统计信息
+
+output:
+  save: false # 是否保存结果到文件
+  save_keywords: false # 是否保存匹配的关键词
+  include_scores: true # 输出中是否包含评分
+  format: "markdown" # 输出格式: markdown, json, csv
+
+# ================================
+# PDF下载配置（可选）
+# ================================
+download:
+  enabled: false # 是否启用PDF下载
+  max_downloads: 10 # 最大下载数量
+  download_dir: "downloads" # 下载目录
+  create_metadata: true # 是否创建元数据文件
+  create_index: true # 是否创建索引文件
+  force_download: false # 是否强制重新下载
+
+# ================================
+# 配置说明
+# ================================
+description: |
+  这是一个个人配置文件模板，包含了所有主要的配置选项。
+
+  使用步骤：
+  1. 复制此文件为您的配置文件 (如: sync_your_field.yaml)
+  2. 修改 user_profile 部分的个人信息
+  3. 调整 search 参数以匹配您的研究领域
+  4. 更新 interest_keywords 为您关注的关键词
+  5. 根据需要启用/禁用各种功能
+  6. 运行: autopaper sync --config your_config_name --config-dir ./conf
+
+  配置文件命名规则：
+  - sync_*.yaml: 自动同步配置（会被定时任务使用）
+  - test_*.yaml: 测试配置（用于调试和验证）
+  - *.yaml: 其他用途配置
+
+  更多信息请参考项目文档。

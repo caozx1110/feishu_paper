@@ -1,43 +1,31 @@
 # AutoPaper
 
-AutoPaper 是一个可复用的 arXiv 文献采集、关键词排序、飞书多维表格同步工具。本分支将原来偏脚本式的仓库整理为标准 Python package，并保留 master 分支已有的搜索、排序、飞书同步、批量配置和定时任务能力。
+AutoPaper 是一个自动采集 arXiv 论文、按关键词筛选排序、同步到飞书多维表格并发送飞书群通知的工具。适合每天按多个研究方向追踪新论文，并把结果沉淀到团队共享表格中。
 
-## 适合谁
+## 功能
 
-- 希望每天按多个研究方向自动同步 arXiv 论文的团队。
-- 希望复用 `ArxivAPI` / `PaperRanker` 做二次开发的用户。
-- 希望用 YAML 管理搜索范围、关键词、Feishu、代理、超时和 smoke test 的用户。
-- 希望命令行输出带表格、面板、状态色和清晰下一步提示的用户。
-
-## 包结构
-
-```text
-src/autopaper/
-  arxiv/           # arXiv 客户端、查询构造、结果解析、PDF 下载
-  ranking/         # 关键词匹配、基础评分、高级评分、排序门面
-  feishu/          # 多维表格、字段/记录/视图、群通知、token、同步写入
-  display/         # 控制台展示和 markdown/txt 报告
-  configuration/   # 配置加载、默认配置、网络代理、运行时设置
-  core/            # ArXiv API 工厂、搜索服务、排序接口
-  sync/            # 单配置/批量同步 orchestration
-  cli/             # autopaper 命令行入口
-  config/          # 随包分发的默认 YAML 配置和 sync 模板
-  scripts/         # 可复制到用户项目的 cron 辅助脚本
-```
-
-旧的脚本式模块路径已经迁移，不再支持 `autopaper.arxiv_core`、`autopaper.sync_to_feishu` 等导入。用户代码应使用顶层 API 或新的子包路径。
+| 能力             | 说明                                                                                                  |
+| ---------------- | ----------------------------------------------------------------------------------------------------- |
+| arXiv 论文采集   | 按领域、分类、最近天数或日期范围检索论文，支持批量分页和网络重试。                                    |
+| 关键词筛选       | 支持兴趣关键词、排除关键词、必须关键词、`AND` / `OR`、通配符、正则和模糊匹配。                    |
+| 论文排序         | 根据命中关键词、评分阈值和可选高级评分策略筛选推荐论文。                                              |
+| 飞书多维表格同步 | 自动查找或创建研究方向表格，写入论文标题、作者、摘要、分类、评分、关键词、链接和日期。                |
+| 去重与增量同步   | 按 ArXiv ID 检查已有记录，只同步新增论文，避免重复写入。                                              |
+| 飞书群通知       | 完整同步后发送汇总消息，包含新增数量、相关表格总计、推荐论文和表格链接。                              |
+| 多方向批量同步   | `sync_*.yaml` 每个文件对应一个研究方向，`all.yaml` 统一批量执行并汇总通知。                       |
+| 定时任务         | 初始化项目时复制 cron 脚本，可每天自动同步并在有新增论文时通知。                                      |
+| 命令行体验       | 提供 `init`、`health`、`feishu check`、`feishu test-notify`、`sync`、`get-token` 等命令。 |
 
 ## 安装
 
 推荐使用 `uv`：
 
 ```bash
-git checkout refactor/industrial-package
 uv sync --group dev
 uv run autopaper --help
 ```
 
-如果要在任意目录使用 CLI，可以先安装为可编辑命令：
+安装为可直接调用的命令：
 
 ```bash
 uv tool install -e .
@@ -47,13 +35,15 @@ autopaper --help
 也可以使用 pip：
 
 ```bash
-python -m pip install -e ".[dev]"
+python -m pip install -e .
 autopaper --help
 ```
 
-## 新项目完整使用步骤
+## Quick Start
 
-1. 初始化工作目录：
+下面是一套从零开始的完整流程：初始化项目、配置飞书、同步全部方向，并在有新增论文时发送飞书群通知。
+
+### 1. 初始化项目
 
 ```bash
 mkdir my-autopaper
@@ -62,102 +52,43 @@ autopaper init --with-scripts
 cp .env.template .env
 ```
 
-如果尚未安装 `autopaper` 命令，也可以用 `uv run --project /path/to/autopaper autopaper ...` 调用本地源码。
+生成后的主要文件：
 
-2. 编辑 `.env`，至少填写：
+| 路径                            | 用途                                       |
+| ------------------------------- | ------------------------------------------ |
+| `.env`                        | 飞书应用密钥、访问 token、多维表格 token。 |
+| `conf/default.yaml`           | 通用默认配置。                             |
+| `conf/all.yaml`               | 批量同步和飞书汇总通知配置。               |
+| `conf/sync_*.yaml`            | 每个研究方向的搜索、关键词和同步配置。     |
+| `scripts/setup_daily_sync.sh` | 定时任务安装和管理脚本。                   |
+| `scripts/daily_arxiv_sync.sh` | 每日同步执行脚本。                         |
+
+如果没有全局安装 `autopaper` 命令，可以在源码仓库中使用：
 
 ```bash
-FEISHU_APP_ID=...
-FEISHU_APP_SECRET=...
-FEISHU_BITABLE_APP_TOKEN=...
-FEISHU_TENANT_ACCESS_TOKEN=...
+uv run autopaper init --target my-autopaper --with-scripts
 ```
 
-`FEISHU_USER_ACCESS_TOKEN` 也可以使用，但自动化任务推荐 `FEISHU_TENANT_ACCESS_TOKEN`。
-可以用 CLI 获取并保存 tenant token；默认只显示脱敏预览，只有加 `--print-token` 才输出完整 token：
+### 2. 配置飞书环境变量
+
+编辑 `.env`：
+
+```bash
+FEISHU_APP_ID=cli_xxx
+FEISHU_APP_SECRET=xxx
+FEISHU_BITABLE_APP_TOKEN=xxx
+FEISHU_TENANT_ACCESS_TOKEN=t-xxx
+```
+
+如果还没有 `FEISHU_TENANT_ACCESS_TOKEN`，可以用应用 ID 和密钥获取并保存：
 
 ```bash
 autopaper get-token --env-file .env --save
 ```
 
-3. 检查配置和基础环境。默认配置不会写入飞书，也不会发送群通知：
+### 3. 配置飞书群通知
 
-```bash
-autopaper validate-config --config all --config-dir ./conf
-autopaper health --config-dir ./conf --skip-network
-```
-
-4. 查看可用同步配置，并做一次稳定的 arXiv 联网 smoke test：
-
-```bash
-autopaper list-configs --config-dir ./conf
-autopaper smoke-search --config-dir ./conf --max-results 1
-```
-
-5. 先 dry-run 单个方向。该命令会真实搜索和排序，但不会写入飞书：
-
-```bash
-autopaper sync --config sync_7_vln --config-dir ./conf --dry-run --limit 2
-```
-
-6. 验证飞书权限。`test-notify` 默认只检查机器人所在群；添加 `--send` 才会发送真实测试消息：
-
-```bash
-autopaper feishu check --config sync_7_vln --config-dir ./conf
-autopaper feishu test-notify --config sync_7_vln --config-dir ./conf
-```
-
-7. 确认范围安全后再真实同步：
-
-```bash
-autopaper sync --config sync_7_vln --config-dir ./conf --limit 2 --no-notify
-autopaper sync --config all --config-dir ./conf --dry-run --limit 2
-```
-
-8. 安装每日定时任务：
-
-```bash
-chmod +x scripts/*.sh
-scripts/setup_daily_sync.sh install
-scripts/setup_daily_sync.sh status
-```
-
-## 配置原则
-
-AutoPaper 的可变行为都应从 YAML 配置或环境变量进入，不在业务入口写死：
-
-- `search.*`: 搜索领域、最近天数、最大结果数、展示数量、最低评分、日期范围、分批窗口。
-- `interest_keywords` / `exclude_keywords`: 关注与排除关键词，支持注释分层、通配符和正则。
-- `required_keywords.*`: 必须关键词过滤，支持 `AND` 列表、单项内 `OR`、模糊匹配和阈值。
-- `intelligent_matching.*`: 高级评分开关、基础/语义/作者/新颖性/引用潜力权重、模糊阈值、时间衰减。
-- `download.*`: PDF 下载、最大下载数、目录、metadata/index、强制下载。
-- `display.*` / `output.*`: 排名、评分、分解、统计、报告保存、格式和关键词输出。
-- `arxiv.*`: API 超时、page size 退避、重试、空页上限、分类映射、联网 smoke test 参数。
-- `runtime.network.*`: 代理模式、代理地址、自动探测、healthcheck、no_proxy。
-- `runtime.env.feishu.*`: health/sync 检查需要的飞书环境变量和占位符规则。
-- `feishu.*`: 同步开关、领域名、阈值、批大小、低分保留、已有记录更新、同步间隔。
-- `feishu.api.*` / `wiki.*` / `bitable.*` / `views.*` / `chat_notification.*`: 飞书 API、Wiki、多维表格、视图和群通知。
-- `user_profile.*`: 用户显示名、描述、研究领域标识。
-
-默认值在 `src/autopaper/config/default.yaml`。用户项目通过 `autopaper init` 复制到 `./conf/default.yaml` 后可以覆盖。
-旧配置中的 `search_config`、`display_config`、`output_config`、`download_config`、`intelligent_matching_config` 会自动归一化到新 schema。
-
-## CLI 常用安全开关
-
-- `--dry-run`: 执行搜索和排序，展示预计同步数量，不写飞书。
-- `--limit N`: 限制本次搜索/排序数量，适合 smoke test。
-- `--since-days N`: 临时覆盖 `search.days`，并关闭 date range。
-- `--no-feishu`: 本次运行跳过飞书写入。
-- `--no-notify`: 本次运行跳过群通知。
-- `--env-file PATH`: 显式加载 `.env` 文件。
-- `--verbose`: 显示诊断细节，例如 arXiv query、分页退避、飞书视图 payload；默认只显示关键进度。
-- `--quiet`: 只显示成功、警告和错误等必要输出。
-
-## 飞书群通知
-
-群聊通知默认关闭。完整同步和定时任务的自动通知使用 `all.yaml` 里的批量汇总通知配置。单个 `sync_*.yaml` 负责各研究方向的搜索、排序和写入；`autopaper sync --config all` 会在所有方向处理完成后，根据 `all.yaml` 发送一条汇总消息。
-
-1. 在用户项目的 `conf/all.yaml` 中开启通知：
+编辑 `conf/all.yaml`，开启批量汇总通知：
 
 ```yaml
 feishu:
@@ -175,48 +106,62 @@ feishu:
       - "oc_xxx_your_chat_id"
 ```
 
-如果机器人只加入了一个测试群，也可以先使用：
+推荐在生产环境填写 `target_chat_ids`。如果机器人只加入一个测试群，可以临时使用：
 
 ```yaml
 send_to_all_chats: true
 target_chat_ids: []
 ```
 
-生产环境更推荐填写 `target_chat_ids`，避免机器人加入多个群时误发。`message_template: "default"` 会发送飞书消息卡片，`"text"` 使用纯文本备用格式。
+通知发送条件：
 
-2. 检查飞书多维表格权限：
+| 条件                          | 说明                                                       |
+| ----------------------------- | ---------------------------------------------------------- |
+| 使用 `sync --config all`    | 批量同步完成后才发送汇总通知。                             |
+| 本次有新增论文                | 没有新增记录时不会通知。                                   |
+| 达到 `min_papers_threshold` | 新增数量小于阈值时不会通知。                               |
+| 未使用跳过参数                | 不要加 `--dry-run`、`--no-feishu` 或 `--no-notify`。 |
 
-```bash
-autopaper --env-file .env feishu check --config sync_7_vln --config-dir ./conf
-```
-
-3. 先预览通知链路，不发送真实消息：
-
-```bash
-autopaper --env-file .env feishu test-notify --config all --config-dir ./conf
-```
-
-4. 发送一条真实测试通知：
+### 4. 检查配置和飞书连通性
 
 ```bash
-autopaper --env-file .env feishu test-notify --config all --config-dir ./conf --send
+autopaper --env-file .env validate-config --config all --config-dir ./conf
+autopaper --env-file .env health --config all --config-dir ./conf --skip-network
+autopaper --env-file .env feishu check --config sync_1_llm_robotics --config-dir ./conf
 ```
 
-如果还没有填写 `target_chat_ids`，并且确认机器人只在测试群内，可以临时群发测试：
+### 5. 先小范围试运行
+
+先确认搜索、排序和飞书写入链路。`--limit 2` 会限制本次处理数量，`--no-notify` 避免测试时发送正式汇总通知：
 
 ```bash
-autopaper --env-file .env feishu test-notify --config all --config-dir ./conf --send --all-chats
+autopaper --env-file .env sync --config sync_1_llm_robotics --config-dir ./conf --limit 2 --no-notify
 ```
 
-5. 跑一次完整同步并自动发送汇总通知：
+再检查批量同步流程，但不写入飞书：
+
+```bash
+autopaper --env-file .env sync --config all --config-dir ./conf --dry-run --limit 2
+```
+
+### 6. 完整同步并发送飞书通知
+
+确认配置无误后，执行完整同步：
 
 ```bash
 autopaper --env-file .env sync --config all --config-dir ./conf
 ```
 
-完整同步只有在本次真正新增论文，且新增数量达到 `feishu.chat_notification.min_papers_threshold` 时才会发送通知。不要加 `--dry-run`、`--no-feishu` 或 `--no-notify`，否则不会写入或不会通知。
+这个命令会：
 
-6. 定时任务自动通知：
+| 步骤                      | 行为                                           |
+| ------------------------- | ---------------------------------------------- |
+| 读取 `conf/sync_*.yaml` | 按每个研究方向分别搜索 arXiv。                 |
+| 关键词筛选和排序          | 只保留满足规则和评分阈值的论文。               |
+| 写入飞书多维表格          | 新论文写入对应研究方向表格。                   |
+| 发送飞书汇总通知          | 有新增论文且达到阈值时，向配置的群聊发送消息。 |
+
+### 7. 开启每日自动同步
 
 ```bash
 chmod +x scripts/*.sh
@@ -224,92 +169,56 @@ scripts/setup_daily_sync.sh install
 scripts/setup_daily_sync.sh status
 ```
 
-定时脚本默认执行 `autopaper sync --config all`，因此只要 `conf/all.yaml` 中开启了 `chat_notification.enabled: true`，并且 `AUTOPAPER_SYNC_FLAGS` 没有包含 `--no-notify`，每天同步完成且有新增论文时就会自动发送飞书通知。日志可查看 `logs/daily_sync_YYYYMMDD.log`。
-
-## 联网 smoke test
-
-命令行快速测试默认使用固定 arXiv ID，避免宽泛搜索受当天结果和限流影响：
+默认每天按 `AUTOPAPER_CRON_SCHEDULE` 执行，默认值为 `0 10 * * *`。可通过环境变量调整：
 
 ```bash
-uv run autopaper smoke-search --max-results 1
+AUTOPAPER_CRON_SCHEDULE="0 9 * * *" scripts/setup_daily_sync.sh install
 ```
 
-如需验证配置里的领域搜索，可以显式使用 query 模式：
+定时任务默认执行：
 
 ```bash
-uv run autopaper smoke-search --mode query --max-results 1
+autopaper sync --config all
 ```
 
-pytest 联网测试默认跳过，需要显式开启：
+因此，只要 `conf/all.yaml` 中开启 `feishu.chat_notification.enabled: true`，每天有新增论文时就会自动发送飞书通知。日志在：
 
-```bash
-AUTOPAPER_RUN_NETWORK_TESTS=1 \
-AUTOPAPER_ENV_FILE=/path/to/project/.env \
-uv run pytest tests/smoke/test_network_smoke.py -q
+```text
+logs/daily_sync_YYYYMMDD.log
 ```
 
-该测试会从 git 的 `master:arxiv_core.py` 加载基线，并比较固定论文 ID 的解析结果，确保 package 与 master 的核心搜索结果一致。
+## 常用命令
 
-## 飞书写入 smoke test
+| 命令                                                                                      | 用途                           |
+| ----------------------------------------------------------------------------------------- | ------------------------------ |
+| `autopaper list-configs --config-dir ./conf`                                            | 查看所有同步配置。             |
+| `autopaper validate-config --config all --config-dir ./conf`                            | 校验全部配置。                 |
+| `autopaper health --config all --config-dir ./conf --skip-network`                      | 检查包、配置和飞书环境变量。   |
+| `autopaper feishu check --config sync_1_llm_robotics --config-dir ./conf`               | 检查飞书多维表格访问权限。     |
+| `autopaper feishu test-notify --config all --config-dir ./conf --send`                  | 发送飞书测试通知。             |
+| `autopaper sync --config sync_1_llm_robotics --config-dir ./conf --limit 2 --no-notify` | 小范围同步单个方向。           |
+| `autopaper sync --config all --config-dir ./conf`                                       | 完整批量同步并按条件发送通知。 |
 
-写入测试会真实访问飞书，请使用极小搜索范围，避免批量污染表格。推荐显式指定 `.env`：
+## 配置入口
 
-```bash
-uv run autopaper --env-file /path/to/project/.env health --config sync_7_vln --config-dir src/autopaper/config
-uv run autopaper --env-file /path/to/project/.env feishu check --config sync_7_vln --config-dir src/autopaper/config
-uv run autopaper --env-file /path/to/project/.env sync --config sync_7_vln --config-dir src/autopaper/config --limit 2 --no-notify
-```
-
-如果只是验证链路，优先用 `--dry-run --limit 2 --since-days 1`，确认 `feishu.sync_threshold` 不会同步大量历史论文后再移除 `--dry-run`。
-
-## 开发验证
-
-```bash
-uv sync --group dev
-uv run pytest
-AUTOPAPER_RUN_NETWORK_TESTS=1 AUTOPAPER_ENV_FILE=/path/to/project/.env uv run pytest tests/smoke/test_network_smoke.py -q
-uv run python -m build
-```
-
-pip 等价命令：
-
-```bash
-python -m pip install -e ".[dev]"
-python -m pytest
-python -m build
-```
-
-## 功能保留矩阵
-
-重构后按功能组做验收，确保没有从 master 分支丢能力：
-
-| 功能组 | 覆盖方式 |
-| --- | --- |
-| arXiv 查询、分类映射、日期范围 | `tests/test_master_consistency.py` 与 git `master:arxiv_core.py` 对比 |
-| 真实 arXiv 联网搜索 | `tests/smoke/test_network_smoke.py`，需 `AUTOPAPER_RUN_NETWORK_TESTS=1` |
-| 关键词过滤、`AND`/`OR`、通配符、正则、基础评分 | `tests/test_modular_refactor.py` |
-| 飞书配置、payload 映射、多选字段 | `tests/test_modular_refactor.py` |
-| 飞书 token helper | `tests/test_modular_refactor.py` 和 `autopaper get-token` |
-| 单配置/批量同步编排 | `autopaper sync --config ...` 和 `autopaper sync --config all` |
-| 群通知和表格链接 | 小范围飞书写入 smoke test |
-| 控制台展示和报告输出 | `tests/test_modular_refactor.py` |
-| CLI、init、health、配置发现、安全默认值 | `tests/test_package.py` |
+| 配置                           | 说明                                                     |
+| ------------------------------ | -------------------------------------------------------- |
+| `search.*`                   | 搜索领域、最近天数、最大结果数、日期范围、批处理窗口。   |
+| `interest_keywords`          | 感兴趣关键词，影响评分和排序。                           |
+| `exclude_keywords`           | 排除关键词，命中后过滤论文。                             |
+| `required_keywords.*`        | 必须命中的关键词规则，支持 `AND` / `OR` 和模糊匹配。 |
+| `feishu.sync_threshold`      | 飞书同步最低评分阈值。                                   |
+| `feishu.chat_notification.*` | 群通知开关、目标群、推荐论文数量、消息模板。             |
+| `user_profile.*`             | 研究方向名称、描述和飞书表格命名。                       |
 
 ## Python API
-
-```python
-from autopaper.configuration import load_config, normalize_config
-from autopaper.core import SearchService, create_arxiv_api
-
-cfg = normalize_config(load_config("sync_7_vln"))
-papers = SearchService(create_arxiv_api(cfg)).fetch(cfg)
-```
 
 ```python
 from autopaper import ArxivAPI, PaperRanker
 
 api = ArxivAPI()
 papers = api.search_papers(query="robot", categories=["cs.RO"], max_results=3)
+
 ranker = PaperRanker()
 ranked, excluded, stats = ranker.filter_and_rank_papers(
     papers,
@@ -318,38 +227,3 @@ ranked, excluded, stats = ranker.filter_and_rank_papers(
     min_score=0.1,
 )
 ```
-
-新的直接子包路径：
-
-```python
-from autopaper.arxiv import ArxivAPI
-from autopaper.ranking import PaperRanker
-from autopaper.feishu import FeishuBitableConnector, sync_papers_to_feishu
-from autopaper.display import PaperDisplayer
-```
-
-顶层导入仍然可用：
-
-```python
-from autopaper import ArxivAPI, PaperRanker, FeishuBitableConnector, sync_papers_to_feishu
-```
-
-## 迁移说明
-
-- `autopaper.arxiv_core.ArxivAPI` -> `autopaper.arxiv.ArxivAPI` 或 `autopaper.ArxivAPI`
-- `autopaper.arxiv_core.PaperRanker` -> `autopaper.ranking.PaperRanker` 或 `autopaper.PaperRanker`
-- `autopaper.feishu_bitable_connector.*` -> `autopaper.feishu.*`
-- `autopaper.feishu_chat_notification.*` -> `autopaper.feishu.notifications.*`
-- `autopaper.sync_to_feishu.sync_papers_to_feishu` -> `autopaper.feishu.sync_papers_to_feishu`
-- `autopaper.paper_display.PaperDisplayer` -> `autopaper.display.PaperDisplayer`
-- `autopaper.get_token` -> `autopaper.feishu.tokens` 或 `autopaper get-token`
-- Hydra 用户可改用 `python -m autopaper.hydra_app`，新项目优先使用 `autopaper` CLI。
-
-## 排障
-
-- arXiv 连接超时：检查 `runtime.network.proxy` 或设置 `SYNC_PROXY_URL`。
-- arXiv 429：缩小 `search.days`、降低 `search.max_results`，或启用更小的分批窗口。
-- 不确定会写入多少：先运行 `autopaper sync --dry-run --limit 2`。
-- 飞书权限不确定：先运行 `autopaper feishu check` 和 `autopaper feishu list-tables`。
-- 飞书 token 过期：运行 `autopaper get-token` 或更新 `.env`。
-- 定时任务无日志：检查 `scripts/setup_daily_sync.sh status` 和 `logs/daily_sync_YYYYMMDD.log`。

@@ -6,7 +6,7 @@ from typing import Any
 
 from omegaconf import DictConfig
 
-from ..arxiv_core import ArxivAPI, ArxivClientConfig
+from ..arxiv import ArxivAPI, ArxivClientConfig
 from ..configuration.runtime import ArxivRuntimeSettings
 
 

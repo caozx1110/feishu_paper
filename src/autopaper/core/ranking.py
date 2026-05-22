@@ -1,5 +1,5 @@
 """Paper ranking public interface."""
 
-from ..arxiv_core import PaperRanker
+from ..ranking import PaperRanker
 
 __all__ = ["PaperRanker"]

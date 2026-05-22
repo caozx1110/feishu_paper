@@ -1,9 +1,9 @@
 """AutoPaper public package interface."""
 
-from .arxiv_core import ArxivAPI, PaperRanker
-from .feishu_bitable_connector import FeishuBitableConnector, FeishuBitableConfig
-from .paper_display import PaperDisplayer
-from .sync_to_feishu import sync_papers_to_feishu
+from .arxiv import ArxivAPI
+from .display import PaperDisplayer
+from .feishu import FeishuBitableConfig, FeishuBitableConnector, sync_papers_to_feishu
+from .ranking import PaperRanker
 
 __version__ = "0.1.0"
 

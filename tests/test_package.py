@@ -3,7 +3,7 @@ from datetime import datetime
 import yaml
 
 import autopaper
-from autopaper.arxiv_core import ArxivAPI
+from autopaper.arxiv import ArxivAPI
 from autopaper.configuration import DEFAULT_CONFIG_DIR, find_sync_configs, load_config, normalize_config
 from autopaper.cli import build_parser, main
 

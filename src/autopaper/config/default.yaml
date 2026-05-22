@@ -213,6 +213,7 @@ arxiv:
     all: ["cs.AI", "cs.LG", "cs.RO", "cs.CV", "cs.CL", "cs.CR", "cs.DC", "cs.DS", "cs.HC", "cs.IR"]
   smoke_test:
     query: "robot"
+    paper_id: "1706.03762"
     field: "robotics"
     categories: ["cs.RO"]
     max_results: 2

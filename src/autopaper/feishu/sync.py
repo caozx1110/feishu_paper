@@ -9,11 +9,9 @@
 """
 
 import os
-from datetime import datetime
-from typing import Dict, List, Any, Optional
 from dotenv import load_dotenv
-from .configuration.runtime import FeishuEnvPolicy
-from .feishu_bitable_connector import FeishuBitableConnector
+from ..configuration.runtime import FeishuEnvPolicy
+from .bitable import FeishuBitableConnector
 
 
 def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None):
@@ -101,9 +99,7 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
             if isinstance(paper, dict):
                 arxiv_id = paper.get('arxiv_id', '')
                 title = paper.get('title', '')
-                authors_str = paper.get('authors_str', '')
                 summary = paper.get('summary', '')
-                categories_str = paper.get('categories_str', '')
                 published_date = paper.get('published_date')
                 updated_date = paper.get('updated_date')
                 pdf_url = paper.get('pdf_url', '')
@@ -111,9 +107,7 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
             else:
                 arxiv_id = getattr(paper, 'arxiv_id', getattr(paper, 'id', ''))
                 title = getattr(paper, 'title', '')
-                authors_str = ", ".join(getattr(paper, 'authors', []))
                 summary = getattr(paper, 'summary', '')
-                categories_str = ", ".join(getattr(paper, 'categories', []))
                 published_date = getattr(paper, 'published_date', None)
                 updated_date = getattr(paper, 'updated_date', None)
                 pdf_url = getattr(paper, 'pdf_url', '')
@@ -302,7 +296,7 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
 
             if view_configs:
                 view_result = connector.manage_table_views(target_table_id, view_configs, auto_cleanup)
-                print(f"📊 视图管理结果:")
+                print("📊 视图管理结果:")
                 print(f"   - 创建: {view_result['created']} 个")
                 print(f"   - 已存在: {view_result['existing']} 个")
                 print(f"   - 删除: {view_result['deleted']} 个")
@@ -312,7 +306,7 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
                     for error in view_result['errors']:
                         print(f"     • {error}")
 
-        print(f"🎉 飞书同步完成！")
+        print("🎉 飞书同步完成！")
         print(f"   - 表格名称: {table_display_name}")
         print(f"   - 研究领域: {research_area}")
         print(f"   - 新增论文: {synced_count} 篇")
@@ -330,92 +324,78 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
                     if chat_config.get('enabled', False):
                         print("📢 准备发送群聊通知...")
 
-                        # 导入群聊通知模块
-                        from .feishu_chat_notification import create_chat_notifier_from_config
+                        from .notifications import create_chat_notifier_from_config
 
-                        # 创建通知器
                         notifier = create_chat_notifier_from_config(cfg)
+                        field_name = user_name.replace('研究员', '').strip() or research_area
 
-                        # 准备统计信息
                         update_stats = {
-                            user_name.replace('研究员', '').strip()
-                            or research_area: {
+                            field_name: {
                                 'new_count': synced_count,
                                 'total_count': len(existing_arxiv_ids) + synced_count,
                                 'table_name': table_display_name,
                             }
                         }
 
-                        # 准备论文数据（只包含新同步的论文，需要转换回原始格式）
                         papers_for_notification = []
                         synced_paper_index = 0
 
-                    for paper in papers:
-                        # 跳过已存在的记录，找到实际同步的论文
-                        if isinstance(paper, dict):
-                            arxiv_id = paper.get('arxiv_id', '')
-                        else:
-                            arxiv_id = getattr(paper, 'arxiv_id', getattr(paper, 'id', ''))
-
-                        if arxiv_id in existing_arxiv_ids:
-                            continue
-
-                        # 检查是否符合同步条件
-                        if isinstance(paper, dict):
-                            score = paper.get('final_score', paper.get('relevance_score', paper.get('score', 0)))
-                        else:
-                            score = getattr(
-                                paper, 'final_score', getattr(paper, 'relevance_score', getattr(paper, 'score', 0))
-                            )
-
-                        if score < sync_threshold:
-                            continue
-
-                        # 这是实际同步的论文
-                        if synced_paper_index < synced_count:
+                        for paper in papers:
                             if isinstance(paper, dict):
-                                paper_for_notification = paper.copy()
-                                # 确保有摘要预览
-                                if 'summary' in paper_for_notification and paper_for_notification['summary']:
-                                    summary = paper_for_notification['summary']
-                                    paper_for_notification['summary'] = (
-                                        summary[:200] + '...' if len(summary) > 200 else summary
-                                    )
+                                arxiv_id = paper.get('arxiv_id', '')
                             else:
-                                paper_for_notification = {
-                                    'title': getattr(paper, 'title', ''),
-                                    'arxiv_id': getattr(paper, 'arxiv_id', getattr(paper, 'id', '')),
-                                    'authors_str': ", ".join(getattr(paper, 'authors', [])),
-                                    'paper_url': getattr(paper, 'paper_url', getattr(paper, 'entry_id', '')),
-                                    'relevance_score': getattr(
-                                        paper,
-                                        'final_score',
-                                        getattr(paper, 'relevance_score', getattr(paper, 'score', 0)),
-                                    ),
-                                    'summary': (
-                                        (getattr(paper, 'summary', '')[:200] + '...')
-                                        if getattr(paper, 'summary', '')
-                                        else ''
-                                    ),
-                                }
-                            papers_for_notification.append(paper_for_notification)
-                            synced_paper_index += 1
+                                arxiv_id = getattr(paper, 'arxiv_id', getattr(paper, 'id', ''))
 
-                    papers_by_field = {
-                        user_name.replace('研究员', '').strip() or research_area: papers_for_notification
-                    }
+                            if arxiv_id in existing_arxiv_ids:
+                                continue
 
-                    # 生成表格链接
-                    table_links = {}
-                    field_name = user_name.replace('研究员', '').strip() or research_area
-                    table_link = notifier.generate_table_link(table_name=table_display_name, table_id=target_table_id)
-                    if table_link:
-                        table_links[field_name] = table_link
-                        print(f"📊 生成表格链接: {table_link}")
-                    else:
-                        print("⚠️ 无法生成表格链接")
+                            if isinstance(paper, dict):
+                                score = paper.get('final_score', paper.get('relevance_score', paper.get('score', 0)))
+                            else:
+                                score = getattr(
+                                    paper, 'final_score', getattr(paper, 'relevance_score', getattr(paper, 'score', 0))
+                                )
 
-                        # 发送通知
+                            if score < sync_threshold:
+                                continue
+
+                            if synced_paper_index < synced_count:
+                                if isinstance(paper, dict):
+                                    paper_for_notification = paper.copy()
+                                    if 'summary' in paper_for_notification and paper_for_notification['summary']:
+                                        summary = paper_for_notification['summary']
+                                        paper_for_notification['summary'] = (
+                                            summary[:200] + '...' if len(summary) > 200 else summary
+                                        )
+                                else:
+                                    paper_for_notification = {
+                                        'title': getattr(paper, 'title', ''),
+                                        'arxiv_id': getattr(paper, 'arxiv_id', getattr(paper, 'id', '')),
+                                        'authors_str': ", ".join(getattr(paper, 'authors', [])),
+                                        'paper_url': getattr(paper, 'paper_url', getattr(paper, 'entry_id', '')),
+                                        'relevance_score': getattr(
+                                            paper,
+                                            'final_score',
+                                            getattr(paper, 'relevance_score', getattr(paper, 'score', 0)),
+                                        ),
+                                        'summary': (
+                                            (getattr(paper, 'summary', '')[:200] + '...')
+                                            if getattr(paper, 'summary', '')
+                                            else ''
+                                        ),
+                                    }
+                                papers_for_notification.append(paper_for_notification)
+                                synced_paper_index += 1
+
+                        papers_by_field = {field_name: papers_for_notification}
+                        table_links = {}
+                        table_link = notifier.generate_table_link(table_name=table_display_name, table_id=target_table_id)
+                        if table_link:
+                            table_links[field_name] = table_link
+                            print(f"📊 生成表格链接: {table_link}")
+                        else:
+                            print("⚠️ 无法生成表格链接")
+
                         notification_success = notifier.notify_paper_updates(update_stats, papers_by_field, table_links)
 
                         if notification_success:

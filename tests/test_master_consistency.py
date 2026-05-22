@@ -4,7 +4,7 @@ import importlib.util
 from datetime import datetime
 from pathlib import Path
 
-from autopaper.arxiv_core import ArxivAPI
+from autopaper.arxiv import ArxivAPI
 from autopaper.configuration import load_config, normalize_config
 from autopaper.configuration.runtime import ArxivRuntimeSettings
 

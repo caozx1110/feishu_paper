@@ -7,7 +7,7 @@ from typing import Any
 
 from omegaconf import DictConfig
 
-from ..arxiv_core import ArxivAPI
+from ..arxiv import ArxivAPI
 
 
 @dataclass

@@ -6,11 +6,10 @@
 
 import os
 import requests
-import json
 from dotenv import load_dotenv
 
 
-def get_tenant_access_token(app_id: str = None, app_secret: str = None) -> dict:
+def get_tenant_access_token(app_id: str = None, app_secret: str = None, base_url: str = None, timeout: int = 30) -> dict:
     """获取应用访问令牌 (tenant_access_token)
 
     Args:
@@ -34,11 +33,12 @@ def get_tenant_access_token(app_id: str = None, app_secret: str = None) -> dict:
     # 请求参数
     payload = {"app_id": app_id, "app_secret": app_secret}
 
-    url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
+    base_url = (base_url or os.getenv('FEISHU_BASE_URL') or "https://open.feishu.cn/open-apis").rstrip("/")
+    url = f"{base_url}/auth/v3/tenant_access_token/internal"
 
     try:
         response = requests.post(
-            url, json=payload, headers={'Content-Type': 'application/json; charset=utf-8'}, timeout=30
+            url, json=payload, headers={'Content-Type': 'application/json; charset=utf-8'}, timeout=timeout
         )
 
         result = response.json()

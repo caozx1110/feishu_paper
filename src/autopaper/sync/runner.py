@@ -15,8 +15,7 @@ from ..configuration.loader import find_sync_configs, load_config, normalize_con
 from ..core import PaperRanker, SearchService, create_arxiv_api
 
 try:
-    from ..feishu_chat_notification import create_chat_notifier_from_config
-    from ..sync_to_feishu import sync_papers_to_feishu
+    from ..feishu import create_chat_notifier_from_config, sync_papers_to_feishu
 
     FEISHU_AVAILABLE = True
 except ImportError:
@@ -94,7 +93,7 @@ class SyncRunner:
                 else:
                     print(f"❌ {config_name}: 失败 - {result.get('error', '未知错误')}")
 
-            print(f"\n📊 批量处理完成!")
+            print("\n📊 批量处理完成!")
             print(f"✅ 成功: {successful_configs} 个")
             print(f"❌ 失败: {len(sync_configs) - successful_configs} 个")
             print(f"📚 总新增论文: {total_new_papers} 篇")

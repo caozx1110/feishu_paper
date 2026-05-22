@@ -184,7 +184,7 @@ def cmd_smoke_search(args: argparse.Namespace) -> int:
 
 
 def cmd_get_token(_: argparse.Namespace) -> int:
-    from ..get_token import main as get_token_main
+    from ..feishu.tokens import main as get_token_main
 
     get_token_main()
     return 0

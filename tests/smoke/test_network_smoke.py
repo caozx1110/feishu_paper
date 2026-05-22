@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import subprocess
 from pathlib import Path
 
 import arxiv
@@ -12,14 +13,26 @@ from autopaper.arxiv import ArxivAPI
 from autopaper.configuration import configure_network, load_config, normalize_config
 from autopaper.configuration.runtime import ArxivRuntimeSettings
 
-MASTER_ARXIV_CORE = Path("/home/ubuntu/ws/feishu_paper/arxiv_core.py")
+REPO_ROOT = Path(__file__).resolve().parents[2]
+MASTER_REF = "master"
 
 
 pytestmark = pytest.mark.network
 
 
-def _load_master_arxiv_core():
-    spec = importlib.util.spec_from_file_location("autopaper_master_arxiv_core_live", MASTER_ARXIV_CORE)
+def _load_master_arxiv_core(tmp_path: Path):
+    try:
+        source = subprocess.check_output(
+            ["git", "show", f"{MASTER_REF}:arxiv_core.py"],
+            cwd=REPO_ROOT,
+            text=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        pytest.skip(f"cannot load {MASTER_REF}:arxiv_core.py: {exc}")
+
+    master_path = tmp_path / "master_arxiv_core_live.py"
+    master_path.write_text(source, encoding="utf-8")
+    spec = importlib.util.spec_from_file_location("autopaper_master_arxiv_core_live", master_path)
     module = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
     spec.loader.exec_module(module)
@@ -47,7 +60,7 @@ def test_live_arxiv_search_returns_results_and_matches_master(tmp_path):
     package_result = next(package_api.client.results(arxiv.Search(id_list=[paper_id], max_results=1)))
     package_paper = package_api._parse_arxiv_result(package_result)
 
-    master = _load_master_arxiv_core()
+    master = _load_master_arxiv_core(tmp_path)
     master_api = master.ArxivAPI(download_dir=str(tmp_path / "master"))
     master_api.client = master_api._create_client(page_size=1, delay_seconds=0)
     master_result = next(master_api.client.results(arxiv.Search(id_list=[paper_id], max_results=1)))

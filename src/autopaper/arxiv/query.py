@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List
 
+from ..terminal import print
+
 
 class ArxivQueryMixin:
     def _build_search_query(

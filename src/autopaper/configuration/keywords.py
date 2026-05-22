@@ -27,14 +27,19 @@ def load_keywords_from_config(cfg: DictConfig) -> tuple[list[str], list[str], li
 
 
 def filter_keywords(keywords: list[str]) -> list[str]:
-    """Drop empty strings and comment-only rows from keyword lists."""
+    """Drop empty/comment rows and de-duplicate keyword lists while preserving order."""
     filtered = []
+    seen = set()
     for keyword in keywords or []:
         if not keyword or not str(keyword).strip():
             continue
         keyword = str(keyword).strip()
         if keyword.startswith("#"):
             continue
+        key = keyword.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
         filtered.append(keyword)
     return filtered
 

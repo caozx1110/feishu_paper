@@ -8,6 +8,7 @@
 # Environment overrides:
 #   AUTOPAPER_PROJECT_DIR=/path/to/project
 #   AUTOPAPER_CONFIG_DIR=/path/to/project/conf
+#   AUTOPAPER_SYNC_FLAGS="--limit 10 --no-notify"
 #   SYNC_TIMEOUT_SECONDS=7200
 #   ARXIV_REQUEST_TIMEOUT=5,30
 
@@ -81,7 +82,7 @@ if ! python3 -m autopaper --version >> "$LOG_FILE" 2>&1; then
 fi
 
 echo "🌐 检查AutoPaper运行环境..." >> "$LOG_FILE"
-HEALTH_CMD=(python3 -m autopaper health)
+HEALTH_CMD=(python3 -m autopaper health --config all)
 if [ -f "$CONFIG_DIR/default.yaml" ]; then
     HEALTH_CMD+=(--config-dir "$CONFIG_DIR")
 fi
@@ -93,6 +94,11 @@ fi
 SYNC_CMD=(python3 -m autopaper sync --config all)
 if [ -f "$CONFIG_DIR/all.yaml" ]; then
     SYNC_CMD+=(--config-dir "$CONFIG_DIR")
+fi
+if [ -n "${AUTOPAPER_SYNC_FLAGS:-}" ]; then
+    # shellcheck disable=SC2206
+    EXTRA_SYNC_FLAGS=($AUTOPAPER_SYNC_FLAGS)
+    SYNC_CMD+=("${EXTRA_SYNC_FLAGS[@]}")
 fi
 
 echo "🚀 开始执行论文采集..." >> "$LOG_FILE"

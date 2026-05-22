@@ -1,18 +1,33 @@
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 from datetime import datetime
 from pathlib import Path
+
+import pytest
 
 from autopaper.arxiv import ArxivAPI
 from autopaper.configuration import load_config, normalize_config
 from autopaper.configuration.runtime import ArxivRuntimeSettings
 
-MASTER_ARXIV_CORE = Path("/home/ubuntu/ws/feishu_paper/arxiv_core.py")
+REPO_ROOT = Path(__file__).resolve().parents[1]
+MASTER_REF = "master"
 
 
-def _load_master_arxiv_core():
-    spec = importlib.util.spec_from_file_location("autopaper_master_arxiv_core", MASTER_ARXIV_CORE)
+def _load_master_arxiv_core(tmp_path: Path):
+    try:
+        source = subprocess.check_output(
+            ["git", "show", f"{MASTER_REF}:arxiv_core.py"],
+            cwd=REPO_ROOT,
+            text=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        pytest.skip(f"cannot load {MASTER_REF}:arxiv_core.py: {exc}")
+
+    master_path = tmp_path / "master_arxiv_core.py"
+    master_path.write_text(source, encoding="utf-8")
+    spec = importlib.util.spec_from_file_location("autopaper_master_arxiv_core", master_path)
     module = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
     spec.loader.exec_module(module)
@@ -20,7 +35,7 @@ def _load_master_arxiv_core():
 
 
 def test_query_builder_matches_master(tmp_path):
-    master = _load_master_arxiv_core()
+    master = _load_master_arxiv_core(tmp_path)
     package_api = ArxivAPI(download_dir=str(tmp_path / "package"))
     master_api = master.ArxivAPI(download_dir=str(tmp_path / "master"))
 
@@ -35,7 +50,7 @@ def test_query_builder_matches_master(tmp_path):
 
 
 def test_default_field_categories_match_master(tmp_path):
-    master = _load_master_arxiv_core()
+    master = _load_master_arxiv_core(tmp_path)
     cfg = normalize_config(load_config("default"))
     settings = ArxivRuntimeSettings.from_config(cfg)
     package_api = ArxivAPI(download_dir=str(tmp_path / "package"))

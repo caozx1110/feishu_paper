@@ -54,7 +54,7 @@ required_keywords:
   fuzzy_match: true # 启用模糊匹配
   similarity_threshold: 0.8 # 模糊匹配相似度阈值
   keywords: # 必须包含的关键词列表，论文必须同时包含所有项
-    - "robust navigation OR vision-and-language navigation OR VLN OR object navigation OR vision-and-language navigation OR vision language navigation"
+    - "robust navigation OR vision-and-language navigation OR VLN OR object navigation OR vision language navigation"
     - "zero-shot OR graph OR map-free OR SLAM OR semantic SLAM OR VLA OR foundation model OR memory"
 
 # ================================

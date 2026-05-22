@@ -7,6 +7,7 @@ from typing import Any, Dict
 
 import requests
 
+from ..terminal import debug, print
 from .config import FeishuBitableConfig
 from .errors import FeishuBitableAPIError
 
@@ -53,7 +54,7 @@ class FeishuAuthMixin:
                 tenant_access_token = result.get('tenant_access_token')
                 expires_in = result.get('expire')
 
-                print(f"✅ 成功获取tenant_access_token，有效期: {expires_in}秒")
+                debug(f"✅ 成功获取 tenant_access_token，有效期: {expires_in} 秒")
                 return tenant_access_token
             else:
                 raise FeishuBitableAPIError(
@@ -96,9 +97,9 @@ class FeishuAuthMixin:
                 if result.get('code') == 0:
                     return result.get('data', {})
                 elif result.get('code') == 99991663:  # token过期
-                    print("🔄 检测到token过期，尝试刷新...")
+                    debug("🔄 检测到token过期，尝试刷新...")
                     if self.refresh_token_if_needed():
-                        print("✅ token刷新成功，重试请求...")
+                        debug("✅ token刷新成功，重试请求...")
                         continue  # 重试请求
                     else:
                         raise FeishuBitableAPIError(

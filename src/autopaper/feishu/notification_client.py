@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 
 import requests
 
+from ..terminal import debug, debug_table, print, success
 from .errors import FeishuBitableAPIError
 
 
@@ -25,9 +26,9 @@ class FeishuChatClientMixin:
                 if result.get('code') == 0:
                     return result.get('data', {})
                 elif result.get('code') == 99991663:  # token过期
-                    print("🔄 检测到token过期，尝试刷新...")
+                    debug("🔄 检测到token过期，尝试刷新...")
                     if self._refresh_token_if_needed():
-                        print("✅ token刷新成功，重试请求...")
+                        debug("✅ token刷新成功，重试请求...")
                         continue
                     else:
                         raise FeishuBitableAPIError(
@@ -71,18 +72,53 @@ class FeishuChatClientMixin:
             result = self._make_request('GET', endpoint, params=params)
             chats = result.get('items', [])
 
-            print(f"🔍 发现 {len(chats)} 个机器人参与的群聊")
-            for chat in chats:
-                chat_id = chat.get('chat_id', '')
-                chat_name = chat.get('name', '未命名群聊')
-                chat_type = chat.get('chat_type', 'unknown')
-                print(f"   - {chat_name} ({chat_type}): {chat_id}")
+            debug(f"🔍 发现 {len(chats)} 个机器人参与的群聊")
+            if chats:
+                debug_table(
+                    "机器人群聊",
+                    ["群聊名", "类型", "Chat ID"],
+                    [
+                        (
+                            chat.get('name', '未命名群聊'),
+                            chat.get('chat_type', 'unknown'),
+                            chat.get('chat_id', ''),
+                        )
+                        for chat in chats
+                    ],
+                )
 
             return chats
 
         except Exception as e:
             print(f"❌ 获取群聊列表失败: {e}")
             return []
+
+    def build_message_payload(self, chat_id: str, message_content: Dict[str, Any]) -> Dict[str, Any]:
+        """Build the Feishu ``im/v1/messages`` payload without sending it."""
+        msg_type = message_content.get("msg_type", "text")
+        content = message_content.get("content", {})
+        if not isinstance(content, dict):
+            raise ValueError("message content must be a dict")
+        if msg_type == "interactive":
+            self._validate_interactive_card(content)
+        elif msg_type == "text" and not isinstance(content.get("text", ""), str):
+            raise ValueError("text message content.text must be a string")
+
+        return {
+            "receive_id": chat_id,
+            "msg_type": msg_type,
+            "content": json.dumps(content, ensure_ascii=False),
+        }
+
+    @staticmethod
+    def _validate_interactive_card(content: Dict[str, Any]) -> None:
+        if not isinstance(content, dict):
+            raise ValueError("interactive content must be a dict")
+        if not isinstance(content.get("elements"), list) or not content["elements"]:
+            raise ValueError("interactive card requires non-empty elements")
+        header = content.get("header")
+        if not isinstance(header, dict) or "title" not in header:
+            raise ValueError("interactive card requires header.title")
 
     def send_message_to_chat(self, chat_id: str, message_content: Dict[str, Any]) -> bool:
         """向指定群聊发送消息
@@ -98,16 +134,12 @@ class FeishuChatClientMixin:
             endpoint = "im/v1/messages"
             params = {"receive_id_type": "chat_id"}
 
-            payload = {
-                "receive_id": chat_id,
-                "msg_type": message_content.get("msg_type", "text"),
-                "content": json.dumps(message_content.get("content", {}), ensure_ascii=False),
-            }
+            payload = self.build_message_payload(chat_id, message_content)
 
             result = self._make_request('POST', endpoint, json=payload, params=params)
 
             if result:
-                print(f"✅ 消息发送成功到群聊: {chat_id}")
+                success(f"消息发送成功到群聊: {chat_id}")
                 return True
             else:
                 print(f"❌ 消息发送失败到群聊: {chat_id}")

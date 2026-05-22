@@ -6,6 +6,8 @@ from typing import Any, Dict, Optional
 
 import arxiv
 
+from ..terminal import print
+
 
 class ArxivParsingMixin:
     def _parse_arxiv_result(self, result: arxiv.Result) -> Optional[Dict[str, Any]]:

@@ -15,7 +15,7 @@ search:
   field: robotics
   # days: 60 # 当不使用date_range时的默认天数
   days: 5
-  max_results: 5000
+  max_results: 800
   min_score: 0.3
 
   # 启用日期范围搜索进行测试

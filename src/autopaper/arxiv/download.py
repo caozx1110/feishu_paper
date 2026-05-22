@@ -9,6 +9,8 @@ from typing import Any, Dict, List, Tuple
 
 import arxiv
 
+from ..terminal import print
+
 
 class ArxivDownloadMixin:
     def download_pdf(

@@ -8,6 +8,8 @@ from typing import Any, Optional, Union
 import yaml
 from omegaconf import DictConfig, OmegaConf
 
+from ..terminal import bullet_list
+
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG_DIR = PACKAGE_DIR / "config"
 
@@ -96,9 +98,7 @@ def find_sync_configs(config_dir: Optional[Union[str, Path]] = None, *, verbose:
     config_names = [config.stem for config in sorted(config_dir_path.glob("sync*.yaml"))]
 
     if verbose:
-        print(f"🔍 发现 {len(config_names)} 个同步配置文件:")
-        for config_name in config_names:
-            print(f"   - {config_name}")
+        bullet_list(f"发现 {len(config_names)} 个同步配置文件", config_names)
 
     return config_names
 

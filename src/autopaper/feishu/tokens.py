@@ -8,6 +8,8 @@ import os
 import requests
 from dotenv import load_dotenv
 
+from ..terminal import panel, print
+
 
 def get_tenant_access_token(app_id: str = None, app_secret: str = None, base_url: str = None, timeout: int = 30) -> dict:
     """获取应用访问令牌 (tenant_access_token)
@@ -105,8 +107,7 @@ def update_env_file(tenant_access_token: str, env_file: str = '.env') -> bool:
 
 def main():
     """主函数 - 获取并保存tenant_access_token"""
-    print("🔑 飞书应用访问令牌获取工具")
-    print("=" * 40)
+    panel("Feishu Token", "飞书应用访问令牌获取工具", style="cyan")
 
     # 检查环境变量
     load_dotenv()

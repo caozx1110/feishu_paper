@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import requests
 
+from ..terminal import debug, print, success, table
 from .auth import FeishuAuthMixin
 from .config import FeishuBitableConfig
 from .errors import FeishuBitableAPIError
@@ -43,8 +44,7 @@ class FeishuBitableConnector(
             {'Content-Type': 'application/json; charset=utf-8', 'Authorization': f'Bearer {config.access_token}'}
         )
 
-        # 打印使用的令牌类型（调试信息）
-        print(f"🔑 使用 {config.token_type}_access_token 进行API认证")
+        debug(f"🔑 使用 {config.token_type}_access_token 进行API认证")
 
 
 
@@ -53,10 +53,12 @@ def test_bitable_connection(config: FeishuBitableConfig) -> bool:
     try:
         connector = FeishuBitableConnector(config)
         tables = connector.list_tables()
-        print("✅ 多维表格连接测试成功")
-        print(f"   当前表格数量: {len(tables)}")
-        for table in tables:
-            print(f"   - {table.get('name', 'Unknown')} ({table.get('table_id', 'Unknown')})")
+        success("多维表格连接测试成功")
+        table(
+            "当前表格",
+            ["表格名", "Table ID"],
+            [(item.get('name', 'Unknown'), item.get('table_id', 'Unknown')) for item in tables],
+        )
         return True
 
     except Exception as e:

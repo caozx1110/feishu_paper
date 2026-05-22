@@ -8,6 +8,8 @@ from typing import Any, Dict, List
 
 import arxiv
 
+from ..terminal import debug, print, success
+
 
 class ArxivSearchMixin:
     def search_papers(
@@ -38,7 +40,7 @@ class ArxivSearchMixin:
         try:
             # 构建搜索查询
             search_query = self._build_search_query(query, categories, date_from, date_to)
-            print(f"🔍 搜索查询: {search_query}")
+            debug(f"🔍 搜索查询: {search_query}")
 
             # 创建搜索对象
             search = arxiv.Search(query=search_query, max_results=max_results, sort_by=sort_by, sort_order=sort_order)
@@ -55,7 +57,7 @@ class ArxivSearchMixin:
                     # 重新配置客户端的page_size
                     self.client = self._create_client(page_size=page_size, delay_seconds=self.config.retry_delay_seconds)
 
-                    print(f"📄 使用page_size={page_size}进行搜索...")
+                    debug(f"📄 使用page_size={page_size}进行搜索...")
 
                     # 重新创建搜索对象
                     search = arxiv.Search(
@@ -77,16 +79,16 @@ class ArxivSearchMixin:
                         if results_count == 0 and len(papers) == 0:
                             empty_page_count += 1
                             if empty_page_count >= self.config.max_empty_pages:
-                                print(f"⚠️  遇到{self.config.max_empty_pages}个连续空页面，尝试更小的page_size...")
+                                debug(f"⚠️  遇到{self.config.max_empty_pages}个连续空页面，尝试更小的page_size...")
                                 break
 
                     # 如果成功获取到论文，跳出循环
                     if papers:
-                        print(f"✅ 成功获取 {len(papers)} 篇论文 (page_size={page_size})")
+                        debug(f"✅ 成功获取 {len(papers)} 篇论文 (page_size={page_size})")
                         return papers
 
                 except Exception as e:
-                    print(f"❌ page_size={page_size}搜索失败: {e}")
+                    debug(f"❌ page_size={page_size}搜索失败: {e}")
                     continue
 
             # 如果所有page_size都失败了，返回空列表
@@ -129,7 +131,7 @@ class ArxivSearchMixin:
         start_date_str = start_date.strftime("%Y-%m-%d")
         end_date_str = end_date.strftime("%Y-%m-%d")
 
-        print(f"📅 获取最近 {days} 天的论文 ({start_date_str} 到 {end_date_str})")
+        print(f"📅 搜索最近 {days} 天论文 ({start_date_str} 到 {end_date_str})")
 
         # 直接调用日期范围搜索方法，复用其稳定的分批处理逻辑
         return self.get_papers_by_date_range(
@@ -182,7 +184,7 @@ class ArxivSearchMixin:
             valid_prefixes = ("cs.", "stat.", "math.", "physics.", "eess.", "q-bio.", "quant-ph", "cond-mat")
             if all(item.startswith(valid_prefixes) for item in field_type):
                 categories = field_type
-                print(f"📋 使用直接指定的分类列表: {categories}")
+                debug(f"📋 使用直接指定的分类列表: {categories}")
             else:
                 categories = self._get_field_categories(field_type)
 
@@ -203,11 +205,11 @@ class ArxivSearchMixin:
 
         batch_config = default_batch_config
 
-        print(f"📅 日期范围: {start_date} 到 {end_date or '当前日期'} (共 {total_days} 天)")
+        debug(f"📅 日期范围: {start_date} 到 {end_date or '当前日期'} (共 {total_days} 天)")
 
         # 如果不启用分批处理或日期范围较小，直接搜索
         if not batch_config.get("enabled", True) or total_days <= batch_config.get("max_days_per_batch", 7):
-            print("🔍 单次搜索...")
+            debug("🔍 单次搜索...")
             return self.search_papers(
                 categories=categories, max_results=max_results, date_from=start_dt, date_to=end_dt
             )
@@ -249,13 +251,13 @@ class ArxivSearchMixin:
 
         current_start = start_dt
 
-        print(f"🔄 启动分批处理，每批最多 {max_days_per_batch} 天，间隔 {min_batch_interval} 秒")
+        debug(f"🔄 启动分批处理，每批最多 {max_days_per_batch} 天，间隔 {min_batch_interval} 秒")
 
         while current_start <= end_dt:
             # 计算当前批次的结束日期
             current_end = min(current_start + timedelta(days=max_days_per_batch - 1), end_dt)
 
-            print(f"📦 批次 {batch_num}: {current_start.strftime('%Y-%m-%d')} 到 {current_end.strftime('%Y-%m-%d')}")
+            debug(f"📦 批次 {batch_num}: {current_start.strftime('%Y-%m-%d')} 到 {current_end.strftime('%Y-%m-%d')}")
 
             try:
                 # 搜索当前批次
@@ -272,7 +274,7 @@ class ArxivSearchMixin:
                         all_papers.append(paper)
                         new_papers_count += 1
 
-                print(f"✅ 批次 {batch_num} 完成: 获取 {len(batch_papers)} 篇论文，新增 {new_papers_count} 篇")
+                debug(f"✅ 批次 {batch_num} 完成: 获取 {len(batch_papers)} 篇论文，新增 {new_papers_count} 篇")
 
             except Exception as e:
                 print(f"❌ 批次 {batch_num} 搜索失败: {e}")
@@ -286,8 +288,8 @@ class ArxivSearchMixin:
 
             # 如果还有更多批次，则等待
             if current_start <= end_dt and min_batch_interval > 0:
-                print(f"⏳ 等待 {min_batch_interval} 秒...")
+                debug(f"⏳ 等待 {min_batch_interval} 秒...")
                 time.sleep(min_batch_interval)
 
-        print(f"🎉 分批处理完成: 总共获取 {len(all_papers)} 篇去重后的论文")
+        success(f"分批搜索完成，获取 {len(all_papers)} 篇去重论文")
         return all_papers

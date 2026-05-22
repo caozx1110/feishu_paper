@@ -7,3 +7,4 @@ python-dotenv>=1.0.0
 PyYAML>=5.4.0
 rapidfuzz>=3.0.0
 requests>=2.25.0
+rich>=13.7.0

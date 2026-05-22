@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
+from ..terminal import print
+
 
 class FeishuFieldMixin:
     def add_field_to_table(

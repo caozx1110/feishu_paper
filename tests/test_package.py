@@ -1,10 +1,11 @@
 from datetime import datetime
+from pathlib import Path
 
 import yaml
 
 import autopaper
 from autopaper.arxiv import ArxivAPI
-from autopaper.configuration import DEFAULT_CONFIG_DIR, find_sync_configs, load_config, normalize_config
+from autopaper.configuration import DEFAULT_CONFIG_DIR, find_sync_configs, load_config, normalize_config, validate_config
 from autopaper.cli import build_parser, main
 
 
@@ -53,6 +54,26 @@ def test_cli_parser_has_core_commands():
     assert "health" in help_text
     assert "init" in help_text
     assert "smoke-search" in help_text
+    assert "validate-config" in help_text
+    assert "feishu" in help_text
+
+
+def test_package_prints_route_through_rich_terminal():
+    package_root = Path(__file__).resolve().parents[1] / "src" / "autopaper"
+    for path in package_root.rglob("*.py"):
+        if path.name == "terminal.py":
+            continue
+        source = path.read_text(encoding="utf-8")
+        if "print(" in source:
+            assert "terminal import" in source, f"{path} has print calls that bypass autopaper.terminal"
+
+
+def test_default_config_is_safe_for_first_run():
+    cfg = normalize_config(load_config("default"))
+
+    assert cfg.feishu.enabled is False
+    assert cfg.feishu.chat_notification.enabled is False
+    assert not any(issue.level == "error" for issue in validate_config(cfg))
 
 
 def test_cli_init_copies_configs(tmp_path):

@@ -5,6 +5,8 @@ from __future__ import annotations
 import time
 from typing import Any, Dict, List, Optional
 
+from ..terminal import debug, key_values, print, success
+
 
 class FeishuNotificationServiceMixin:
     def notify_paper_updates(
@@ -21,17 +23,17 @@ class FeishuNotificationServiceMixin:
             是否成功发送到至少一个群聊
         """
         if not self.chat_config.enabled:
-            print("ℹ️ 群聊通知功能已禁用")
+            debug("ℹ️ 群聊通知功能已禁用")
             return False
 
         # 检查是否有足够的更新需要通知
         total_new = sum(stats.get('new_count', 0) for stats in update_stats.values())
         if total_new < self.chat_config.min_papers_threshold:
-            print(f"ℹ️ 新增论文数量({total_new})低于通知阈值({self.chat_config.min_papers_threshold})，跳过通知")
+            debug(f"ℹ️ 新增论文数量({total_new})低于通知阈值({self.chat_config.min_papers_threshold})，跳过通知")
             return False
 
         print("📢 开始发送论文更新通知...")
-        print(f"   📊 统计信息: {total_new} 篇新论文，{len(update_stats)} 个领域")
+        key_values("通知统计", {"新增论文": f"{total_new} 篇", "领域数": len(update_stats)})
 
         # 生成推荐论文
         recommended_papers = self._select_recommended_papers(papers_by_field)
@@ -41,10 +43,17 @@ class FeishuNotificationServiceMixin:
         if not chats:
             print("❌ 没有找到可发送的群聊")
             return False
+        chats = self._filter_target_chats(chats)
+        if not chats:
+            print("⚠️ 未匹配到通知目标群聊，请检查 feishu.chat_notification.target_chat_ids")
+            return False
 
         # 创建消息内容
         try:
-            message_content = self.create_paper_update_message(update_stats, recommended_papers, table_links)
+            if self.chat_config.message_template in {"text", "simple"}:
+                message_content = self.create_simple_text_message(update_stats, recommended_papers, table_links)
+            else:
+                message_content = self.create_paper_update_message(update_stats, recommended_papers, table_links)
         except Exception as e:
             print(f"⚠️ 创建富文本消息失败，使用简单文本: {e}")
             message_content = self.create_simple_text_message(update_stats, recommended_papers, table_links)
@@ -61,16 +70,25 @@ class FeishuNotificationServiceMixin:
                 continue
 
             total_chats += 1
-            print(f"📤 发送通知到: {chat_name}")
+            debug(f"📤 发送通知到: {chat_name}")
 
             if self.send_message_to_chat(chat_id, message_content):
                 success_count += 1
 
             # 避免发送过快
-            time.sleep(0.5)
+            if self.chat_config.send_delay_seconds > 0:
+                time.sleep(self.chat_config.send_delay_seconds)
 
-        print(f"📊 通知发送完成: {success_count}/{total_chats} 个群聊发送成功")
+        success(f"通知发送完成: {success_count}/{total_chats} 个群聊发送成功")
         return success_count > 0
+
+    def _filter_target_chats(self, chats: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        target_chat_ids = set(self.chat_config.target_chat_ids or ())
+        if target_chat_ids:
+            return [chat for chat in chats if chat.get('chat_id') in target_chat_ids]
+        if self.chat_config.send_to_all_chats:
+            return chats
+        return []
 
     def _select_recommended_papers(self, papers_by_field: Dict[str, List[Dict]]) -> Dict[str, List[Dict]]:
         """为每个领域选择推荐论文"""

@@ -5,6 +5,7 @@
 ```bash
 uv sync --group dev
 uv run autopaper --help
+uv run autopaper validate-config
 uv run pytest
 ```
 
@@ -32,9 +33,9 @@ python -m build
 
 ## Master Consistency
 
-`tests/test_master_consistency.py` 会动态加载 `/home/ubuntu/ws/feishu_paper/arxiv_core.py`，比较：
+`tests/test_master_consistency.py` 会从 git 中动态加载 `master:arxiv_core.py`，比较：
 
 - 查询字符串构造。
 - 默认领域到 arXiv 分类映射。
 
-`tests/smoke/test_network_smoke.py` 会在显式开启时执行真实 arXiv 搜索，并比较 package 与 master 返回的第一篇论文。
+`tests/smoke/test_network_smoke.py` 会在显式开启时执行真实 arXiv 固定 ID 搜索，并比较 package 与 master 返回的论文 ID 和标题。

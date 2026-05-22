@@ -13,19 +13,21 @@ user_profile:
 
 # 搜索配置
 search_config:
-  days: 14
-  max_results: 500
-  min_score: 0.1
+  days: 3
+  max_results: 300
+  min_score: 0.3
   field: "all"
 
 # 飞书配置
 feishu:
   enabled: true
-  sync_threshold: 0.1
+  sync_threshold: 0.3
   batch_size: 50
   chat_notification:
-    enabled: true
-    min_papers_threshold: 1
+    enabled: false
+    min_papers_threshold: 2
+    send_to_all_chats: false
+    target_chat_ids: []
 
 # 显示配置
 display_config:

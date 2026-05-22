@@ -37,7 +37,7 @@ class AdvancedScoringMixin:
         found_keywords = []
 
         for keyword in keywords:
-            if keyword.lower() in text_lower:
+            if self._contains_keyword(keyword, text_lower):
                 found_keywords.append(keyword)
 
         # 共现奖励 - 同时出现多个关键词时给予额外分数
@@ -56,11 +56,11 @@ class AdvancedScoringMixin:
         summary_lower = summary.lower()
 
         # 标题中的权重
-        if keyword_lower in title_lower:
+        if self._contains_keyword(keyword_lower, title_lower):
             title_words = title_lower.split()
             keyword_position = -1
             for i, word in enumerate(title_words):
-                if keyword_lower in word:
+                if self._contains_keyword(keyword_lower, word):
                     keyword_position = i
                     break
 
@@ -70,9 +70,11 @@ class AdvancedScoringMixin:
                 weights["title"] = 3.0 * position_factor
 
         # 摘要中的权重 - 区分前半部分和后半部分
-        if keyword_lower in summary_lower:
+        if self._contains_keyword(keyword_lower, summary_lower):
             summary_length = len(summary_lower)
             keyword_pos = summary_lower.find(keyword_lower)
+            if keyword_pos < 0:
+                keyword_pos = summary_length
 
             if keyword_pos < summary_length * 0.3:  # 前30%
                 weights["summary_start"] = 2.5

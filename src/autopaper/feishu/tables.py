@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from ..terminal import print
+
 
 class FeishuTableMixin:
     def create_table(self, table_name: str, fields: List[Dict[str, Any]] = None) -> Dict[str, Any]:

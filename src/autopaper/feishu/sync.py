@@ -11,6 +11,7 @@
 import os
 from dotenv import load_dotenv
 from ..configuration.runtime import FeishuEnvPolicy
+from ..terminal import debug, key_values, print, success, table
 from .bitable import FeishuBitableConnector
 
 
@@ -27,7 +28,7 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
 
     # 检查飞书配置
     feishu_cfg = cfg.get('feishu', {})
-    if not feishu_cfg.get('enabled', True):
+    if not feishu_cfg.get('enabled', False):
         print("ℹ️ 飞书同步已禁用")
         return False
 
@@ -40,7 +41,7 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
         return False
 
     try:
-        print("\n🔗 开始改进版飞书同步...")
+        print("\n🔗 开始飞书同步...")
         connector = FeishuBitableConnector()
 
         # 获取用户配置信息
@@ -51,7 +52,7 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
         # 根据研究领域创建表格名称
         table_display_name = f"{user_name.replace('研究员', '')}论文表"
 
-        print(f"📊 为研究领域 '{research_area}' 处理专用数据表...")
+        debug(f"📊 为研究领域 '{research_area}' 处理专用数据表...")
 
         # 查找或创建数据表
         target_table_id = connector.find_table_by_name(table_display_name)
@@ -61,15 +62,15 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
             table_result = connector.create_domain_papers_table(table_display_name, research_area)
             if table_result:
                 target_table_id = table_result.get('table_id')
-                print(f"✅ 数据表创建成功，ID: {target_table_id}")
+                debug(f"✅ 数据表创建成功，ID: {target_table_id}")
             else:
                 print("❌ 数据表创建失败")
                 return False
         else:
-            print(f"✅ 找到现有数据表: {table_display_name} (ID: {target_table_id})")
+            debug(f"✅ 找到现有数据表: {table_display_name} (ID: {target_table_id})")
 
         # 获取现有记录，避免重复
-        print("🔍 检查现有记录，避免重复...")
+        debug("🔍 检查现有记录，避免重复...")
         existing_records = connector.get_all_records(target_table_id)
         existing_arxiv_ids = set()
 
@@ -88,7 +89,7 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
             if arxiv_id:
                 existing_arxiv_ids.add(arxiv_id)
 
-        print(f"📋 发现 {len(existing_arxiv_ids)} 条现有记录")
+        debug(f"📋 发现 {len(existing_arxiv_ids)} 条现有记录")
 
         # 准备新的论文数据
         new_papers_data = []
@@ -280,7 +281,7 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
                 if result and result.get('records'):
                     batch_synced = len(result.get('records', []))
                     synced_count += batch_synced
-                    print(f"✅ 第 {i//batch_size + 1} 批同步成功: {batch_synced} 篇")
+                    debug(f"✅ 第 {i//batch_size + 1} 批同步成功: {batch_synced} 篇")
                 else:
                     print(f"⚠️ 第 {i//batch_size + 1} 批同步可能失败")
             except Exception as e:
@@ -290,27 +291,32 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
         # 管理视图（如果配置了的话）
         view_config = feishu_cfg.get('views', {})
         if view_config.get('enabled', False):
-            print("🎯 管理表格视图...")
+            debug("🎯 管理表格视图...")
             view_configs = view_config.get('create_views', [])
             auto_cleanup = view_config.get('auto_cleanup', True)
 
             if view_configs:
                 view_result = connector.manage_table_views(target_table_id, view_configs, auto_cleanup)
-                print("📊 视图管理结果:")
-                print(f"   - 创建: {view_result['created']} 个")
-                print(f"   - 已存在: {view_result['existing']} 个")
-                print(f"   - 删除: {view_result['deleted']} 个")
+                key_values(
+                    "视图管理结果",
+                    {
+                        "创建": f"{view_result['created']} 个",
+                        "已存在": f"{view_result['existing']} 个",
+                        "删除": f"{view_result['deleted']} 个",
+                    },
+                )
 
                 if view_result['errors']:
                     print(f"   - 错误: {len(view_result['errors'])} 个")
                     for error in view_result['errors']:
                         print(f"     • {error}")
 
-        print("🎉 飞书同步完成！")
-        print(f"   - 表格名称: {table_display_name}")
-        print(f"   - 研究领域: {research_area}")
-        print(f"   - 新增论文: {synced_count} 篇")
-        print(f"   - 总记录数: {len(existing_arxiv_ids) + synced_count} 篇")
+        success("飞书同步完成")
+        table(
+            "飞书同步摘要",
+            ["表格名称", "研究领域", "新增论文", "总记录数"],
+            [(table_display_name, research_area, synced_count, len(existing_arxiv_ids) + synced_count)],
+        )
 
         # 发送群聊通知（如果有新论文且配置启用，且不在批量模式）
         if synced_count > 0:
@@ -318,7 +324,7 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
                 # 检查是否处于批量模式
                 batch_mode = os.getenv('BATCH_MODE', '0') == '1'
                 if batch_mode:
-                    print("ℹ️ 批量模式运行，跳过个别群聊通知")
+                    debug("ℹ️ 批量模式运行，跳过个别群聊通知")
                 else:
                     chat_config = feishu_cfg.get('chat_notification', {})
                     if chat_config.get('enabled', False):
@@ -392,7 +398,7 @@ def sync_papers_to_feishu(papers, cfg, matched_keywords_map=None, score_map=None
                         table_link = notifier.generate_table_link(table_name=table_display_name, table_id=target_table_id)
                         if table_link:
                             table_links[field_name] = table_link
-                            print(f"📊 生成表格链接: {table_link}")
+                            debug(f"📊 生成表格链接: {table_link}")
                         else:
                             print("⚠️ 无法生成表格链接")
 

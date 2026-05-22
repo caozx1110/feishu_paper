@@ -8,6 +8,7 @@ from typing import Any
 from omegaconf import DictConfig
 
 from ..arxiv import ArxivAPI
+from ..terminal import debug
 
 
 @dataclass
@@ -27,7 +28,7 @@ class SearchService:
             if not start_date:
                 raise ValueError("日期范围搜索需要指定 start_date")
 
-            print(f"📅 使用日期范围搜索: {start_date} 到 {end_date or '当前日期'}")
+            debug(f"📅 使用日期范围搜索: {start_date} 到 {end_date or '当前日期'}")
             return self.arxiv_api.get_papers_by_date_range(
                 start_date=start_date,
                 end_date=end_date,

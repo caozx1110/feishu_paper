@@ -9,6 +9,7 @@ from typing import Any, Mapping
 import arxiv
 
 from ..configuration.runtime import ArxivRuntimeSettings
+from ..terminal import print
 from .config import ArxivClientConfig
 from .download import ArxivDownloadMixin
 from .parsing import ArxivParsingMixin

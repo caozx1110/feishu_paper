@@ -23,7 +23,8 @@ class FeishuMessageBuilderMixin:
         Returns:
             消息内容字典
         """
-        # 构建富文本消息
+        # 构建飞书消息卡片。interactive 消息的 content 必须是完整 card，
+        # 不能只包含 elements，否则部分租户会拒收或渲染为空。
         elements = []
 
         # 标题
@@ -59,7 +60,8 @@ class FeishuMessageBuilderMixin:
                 field_content = f"🎯 **{field_name}**\n📈 新增: {new_count} 篇 | 📚 总计: {total_count} 篇"
 
                 # 添加表格链接（如果提供）
-                if table_links and field_name in table_links:
+                include_links = getattr(self.chat_config, "include_table_links", True)
+                if include_links and table_links and field_name in table_links:
                     table_link = table_links[field_name]
                     field_content += f"\n📊 [查看完整表格]({table_link})"
 
@@ -69,8 +71,12 @@ class FeishuMessageBuilderMixin:
                 if field_name in recommended_papers and recommended_papers[field_name]:
                     paper = recommended_papers[field_name][0]  # 取第一篇推荐论文
 
-                    title = paper.get('title', '未知标题')[:100]  # 限制标题长度
-                    authors = paper.get('authors_str', '')[:80]  # 限制作者长度
+                    title = self._truncate_message_text(
+                        paper.get('title', '未知标题'), getattr(self.chat_config, "max_title_chars", 100)
+                    )
+                    authors = self._truncate_message_text(
+                        paper.get('authors_str', ''), getattr(self.chat_config, "max_authors_chars", 80)
+                    )
                     score = paper.get('relevance_score', paper.get('final_score', 0))
                     arxiv_id = paper.get('arxiv_id', '')
                     paper_url = paper.get('paper_url', '')
@@ -90,7 +96,17 @@ class FeishuMessageBuilderMixin:
 
         elements.append({"tag": "div", "text": {"tag": "plain_text", "content": "🤖 ArXiv论文采集机器人自动推送"}})
 
-        return {"msg_type": "interactive", "content": {"elements": elements}}
+        return {
+            "msg_type": "interactive",
+            "content": {
+                "config": {"wide_screen_mode": True},
+                "header": {
+                    "template": "blue",
+                    "title": {"tag": "plain_text", "content": "ArXiv 论文更新"},
+                },
+                "elements": elements,
+            },
+        }
 
     def create_simple_text_message(
         self,
@@ -125,7 +141,8 @@ class FeishuMessageBuilderMixin:
                 lines.append(f"  📈 新增: {new_count} 篇 | 📚 总计: {total_count} 篇")
 
                 # 添加表格链接（如果提供）
-                if table_links and field_name in table_links:
+                include_links = getattr(self.chat_config, "include_table_links", True)
+                if include_links and table_links and field_name in table_links:
                     table_link = table_links[field_name]
                     lines.append(f"  📊 表格链接: {table_link}")
 
@@ -144,3 +161,10 @@ class FeishuMessageBuilderMixin:
         lines.append("🤖 ArXiv论文采集机器人")
 
         return {"msg_type": "text", "content": {"text": "\n".join(lines)}}
+
+    @staticmethod
+    def _truncate_message_text(value: Any, max_chars: int) -> str:
+        text = str(value or "")
+        if max_chars <= 0 or len(text) <= max_chars:
+            return text
+        return text[: max_chars - 1].rstrip() + "…"

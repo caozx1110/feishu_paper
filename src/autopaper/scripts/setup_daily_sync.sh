@@ -32,9 +32,10 @@ show_help() {
     echo "  $0 test         手动执行一次同步脚本"
     echo "  $0 logs         查看最近日志"
     echo ""
-    echo "环境变量:"
-    echo "  AUTOPAPER_CRON_SCHEDULE='0 10 * * *'"
-    echo "  AUTOPAPER_PROJECT_DIR='$PROJECT_DIR'"
+	echo "环境变量:"
+	echo "  AUTOPAPER_CRON_SCHEDULE='0 10 * * *'"
+	echo "  AUTOPAPER_PROJECT_DIR='$PROJECT_DIR'"
+	echo "  AUTOPAPER_SYNC_FLAGS='--limit 10 --no-notify'"
 }
 
 check_timezone() {

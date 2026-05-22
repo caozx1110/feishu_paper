@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import importlib
+import json
 from datetime import datetime
 
 import pytest
 
 from autopaper import ArxivAPI, FeishuBitableConfig, FeishuBitableConnector, PaperDisplayer, PaperRanker
+from autopaper.feishu import ChatNotificationConfig, FeishuChatNotifier
+from autopaper.configuration.keywords import filter_keywords
 from autopaper.feishu.tokens import get_tenant_access_token, update_env_file
 
 
@@ -75,6 +78,27 @@ def test_ranking_wildcard_regex_and_basic_scoring_are_preserved():
     assert ranker.calculate_relevance_score(paper, interest_keywords=["*"])[0] == 1.0
 
 
+def test_keyword_loading_deduplicates_and_word_boundaries_reduce_false_hits():
+    assert filter_keywords(["# section", "AI", "ai", "robot", " robot "]) == ["AI", "robot"]
+
+    ranker = PaperRanker()
+    score, excluded, matched, _ = ranker.calculate_relevance_score(
+        {
+            "title": "A said result for navigation",
+            "summary": "This text should not infer a standalone abbreviation.",
+            "authors_str": "AutoPaper Test",
+            "categories": ["cs.RO"],
+            "published_date": datetime.now(),
+        },
+        interest_keywords=["ai"],
+        exclude_keywords=["drug"],
+    )
+
+    assert score == 0
+    assert not excluded
+    assert matched == []
+
+
 def test_feishu_config_and_payload_mapping_are_preserved():
     config = FeishuBitableConfig(
         app_id="cli_a_test",
@@ -97,6 +121,43 @@ def test_feishu_config_and_payload_mapping_are_preserved():
     assert payload["论文链接"]["link"].endswith("2601.00001")
     assert payload["PDF链接"]["text"] == "2601.00001"
     assert connector.prepare_multi_select_field_data("cs.RO, cs.AI, cs.RO") == ["cs.RO", "cs.AI"]
+
+
+def test_feishu_notification_card_payload_is_valid_and_targeted():
+    config = FeishuBitableConfig(
+        app_id="cli_a_test",
+        app_secret="secret",
+        tenant_access_token="t-" + "1" * 32,
+        app_token="app_token",
+    )
+    notifier = FeishuChatNotifier(
+        config,
+        ChatNotificationConfig(enabled=True, target_chat_ids=("oc_keep",), send_to_all_chats=False),
+    )
+
+    message = notifier.create_paper_update_message(
+        {"VLN": {"new_count": 1, "total_count": 3, "table_name": "VLN论文表"}},
+        {
+            "VLN": [
+                {
+                    "title": "Vision-language navigation with graph memory",
+                    "authors_str": "AutoPaper Test",
+                    "relevance_score": 0.91,
+                    "arxiv_id": "2601.00001",
+                    "paper_url": "https://arxiv.org/abs/2601.00001",
+                }
+            ]
+        },
+        {"VLN": "https://feishu.cn/base/app_token?table=tbl"},
+    )
+    payload = notifier.build_message_payload("oc_keep", message)
+    content = json.loads(payload["content"])
+
+    assert payload["msg_type"] == "interactive"
+    assert content["config"]["wide_screen_mode"] is True
+    assert content["header"]["title"]["content"] == "ArXiv 论文更新"
+    assert content["elements"]
+    assert notifier._filter_target_chats([{"chat_id": "oc_keep"}, {"chat_id": "oc_skip"}]) == [{"chat_id": "oc_keep"}]
 
 
 def test_token_helpers_are_usable_from_new_feishu_module(monkeypatch, tmp_path):

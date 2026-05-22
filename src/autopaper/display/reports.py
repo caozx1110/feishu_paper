@@ -6,6 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
+from ..terminal import print
+
 
 class ReportWriterMixin:
     def save_papers_report(

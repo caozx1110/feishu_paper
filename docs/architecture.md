@@ -16,12 +16,13 @@ AutoPaper 的主路径由四层组成：
 
 4. `cli`
 
-只做参数解析和命令分发。所有默认行为都来自配置文件。
+只做参数解析、配置校验、Feishu 诊断和命令分发。所有默认行为都来自配置文件；真实写入类操作提供 `--dry-run` / `--no-feishu` / `--no-notify` 安全开关。
 
-兼容层：
+迁移策略：
 
-- `autopaper.arxiv_core` 保留公共类 `ArxivAPI` 和 `PaperRanker`。
-- `autopaper.arxiv_hydra` 保留旧 Hydra 入口。
+- 旧脚本模块路径不再保留，例如 `autopaper.arxiv_core`、`autopaper.sync_to_feishu`。
+- 顶层 API 继续保留，例如 `autopaper.ArxivAPI`、`autopaper.PaperRanker`、`autopaper.FeishuBitableConnector`。
+- Hydra 用户改用 `python -m autopaper.hydra_app`。
 
 ## Configuration First
 

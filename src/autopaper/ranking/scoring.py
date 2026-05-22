@@ -64,7 +64,7 @@ class BaseScoringMixin:
         matched_excludes = []
         if expanded_excludes:
             for exclude_term in expanded_excludes:
-                if exclude_term.lower() in full_text:
+                if self._contains_keyword(exclude_term, full_text):
                     excluded = True
                     matched_excludes.append(exclude_term)
 

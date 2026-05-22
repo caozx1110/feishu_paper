@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Tuple
 
+from ..terminal import print
+
 try:
     from rapidfuzz import fuzz, process
     RAPIDFUZZ_AVAILABLE = True
@@ -85,7 +87,7 @@ class KeywordMatchingMixin:
             List[str]: 匹配到的具体关键词列表
         """
         # 检查是否包含OR逻辑
-        if " or " in keyword_item.lower() or " OR " in keyword_item:
+        if re.search(r"\s+or\s+", keyword_item, flags=re.IGNORECASE):
             return self._check_or_keyword_detailed(keyword_item, full_text, fuzzy_match, similarity_threshold)
         else:
             # 单个关键词
@@ -109,12 +111,8 @@ class KeywordMatchingMixin:
         Returns:
             List[str]: 匹配到的具体关键词列表
         """
-        # 分割OR关键词
-        or_parts = []
-        if " OR " in or_keyword:
-            or_parts = [part.strip() for part in or_keyword.split(" OR ")]
-        elif " or " in or_keyword:
-            or_parts = [part.strip() for part in or_keyword.split(" or ")]
+        # 分割OR关键词，大小写不敏感，并兼容多空格
+        or_parts = [part.strip() for part in re.split(r"\s+or\s+", or_keyword, flags=re.IGNORECASE) if part.strip()]
 
         if len(or_parts) < 2:
             return []
@@ -142,10 +140,12 @@ class KeywordMatchingMixin:
         Returns:
             bool: 是否匹配
         """
-        keyword_lower = keyword.lower()
+        keyword_lower = keyword.lower().strip()
+        if not keyword_lower or keyword_lower.startswith("#"):
+            return False
 
         # 精确匹配
-        if keyword_lower in full_text:
+        if self._contains_keyword(keyword_lower, full_text):
             return True
 
         # 模糊匹配（如果启用）
@@ -154,7 +154,7 @@ class KeywordMatchingMixin:
             keyword_variants = self._generate_keyword_variants(keyword)
 
             for variant in keyword_variants:
-                if variant.lower() in full_text:
+                if self._contains_keyword(variant.lower(), full_text):
                     return True
 
             # 使用字符串相似度匹配
@@ -245,7 +245,7 @@ class KeywordMatchingMixin:
 
         except ImportError:
             # 如果没有difflib，使用简单的包含检查
-            return keyword in text
+            return self._contains_keyword(keyword, text)
 
     def _expand_keywords(self, keywords: List[str]) -> List[str]:
         """扩展关键词列表，包含同义词和缩写"""
@@ -281,7 +281,7 @@ class KeywordMatchingMixin:
         keyword_lower = keyword.lower()
 
         # 快速检查精确匹配
-        if keyword_lower in text.lower():
+        if self._contains_keyword(keyword_lower, text):
             return 1.0
 
         # 分词并限制检查范围以提高效率
@@ -305,7 +305,7 @@ class KeywordMatchingMixin:
         keyword_lower = keyword.lower()
 
         # 快速检查精确匹配
-        if keyword_lower in text.lower():
+        if self._contains_keyword(keyword_lower, text):
             return 1.0
 
         words = re.findall(r"\b\w+\b", text.lower())
@@ -378,7 +378,7 @@ class KeywordMatchingMixin:
             return bool(regex.search(text))
         except re.error:
             # 如果正则表达式无效，回退到普通字符串匹配
-            return keyword.lower() in text.lower()
+            return self._contains_keyword(keyword, text)
 
     def _enhance_keyword_matching(self, keyword: str, text: str) -> Tuple[bool, float]:
         """
@@ -393,7 +393,7 @@ class KeywordMatchingMixin:
             return matched, 1.0 if matched else 0.0
 
         # 普通字符串匹配
-        if keyword.lower() in text.lower():
+        if self._contains_keyword(keyword, text):
             return True, 1.0
 
         # 模糊匹配
@@ -402,6 +402,26 @@ class KeywordMatchingMixin:
             return True, fuzzy_score
 
         return False, 0.0
+
+    @staticmethod
+    def _contains_keyword(keyword: str, text: str) -> bool:
+        """Match whole tokens for normal keywords and normalized phrases."""
+        keyword = str(keyword or "").strip().lower()
+        text = str(text or "").lower()
+        if not keyword or not text:
+            return False
+
+        normalized_keyword = re.sub(r"[-_/]+", " ", keyword)
+        normalized_text = re.sub(r"[-_/]+", " ", text)
+
+        if re.search(r"[\w]", normalized_keyword, flags=re.UNICODE):
+            pattern = r"(?<!\w)" + re.escape(normalized_keyword) + r"(?!\w)"
+            if re.search(pattern, normalized_text):
+                return True
+            if re.fullmatch(r"[\w\s]+", normalized_keyword, flags=re.UNICODE):
+                return False
+
+        return keyword in text
 
     def _parse_keyword_weights(self, raw_keywords: List[str]) -> Dict[str, str]:
         """

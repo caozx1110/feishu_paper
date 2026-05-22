@@ -43,8 +43,8 @@ def test_live_arxiv_search_returns_results_and_matches_master(tmp_path):
     if os.getenv("AUTOPAPER_RUN_NETWORK_TESTS") != "1":
         pytest.skip("set AUTOPAPER_RUN_NETWORK_TESTS=1 to run live arXiv smoke tests")
 
-    env_file = os.getenv("AUTOPAPER_ENV_FILE", "/home/ubuntu/ws/feishu_paper/.env")
-    if Path(env_file).exists():
+    env_file = os.getenv("AUTOPAPER_ENV_FILE")
+    if env_file and Path(env_file).exists():
         load_dotenv(env_file, override=True)
 
     cfg = normalize_config(load_config("default"))

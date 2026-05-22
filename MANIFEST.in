@@ -2,6 +2,7 @@ include README.md
 include LICENSE
 include requirements.txt
 include .env.template
+include src/autopaper/py.typed
 recursive-include src/autopaper/config *.yaml
 recursive-include src/autopaper/scripts *
 recursive-include src/autopaper/templates *

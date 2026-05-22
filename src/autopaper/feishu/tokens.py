@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""
-飞书访问令牌获取工具
-用于获取tenant_access_token（应用访问令牌）
-"""
+"""Feishu tenant_access_token helpers."""
 
 import os
+from pathlib import Path
+
 import requests
 from dotenv import load_dotenv
 
-from ..terminal import panel, print
+from ..terminal import error, info, key_values, panel, print, success
 
 
 def get_tenant_access_token(app_id: str = None, app_secret: str = None, base_url: str = None, timeout: int = 30) -> dict:
@@ -75,9 +74,12 @@ def update_env_file(tenant_access_token: str, env_file: str = '.env') -> bool:
         是否成功更新
     """
     try:
+        env_path = Path(env_file).expanduser()
+        env_path.parent.mkdir(parents=True, exist_ok=True)
+
         # 读取现有的.env文件
-        if os.path.exists(env_file):
-            with open(env_file, 'r', encoding='utf-8') as f:
+        if env_path.exists():
+            with env_path.open('r', encoding='utf-8') as f:
                 lines = f.readlines()
         else:
             lines = []
@@ -95,65 +97,81 @@ def update_env_file(tenant_access_token: str, env_file: str = '.env') -> bool:
             lines.append(f'FEISHU_TENANT_ACCESS_TOKEN={tenant_access_token}\n')
 
         # 写回文件
-        with open(env_file, 'w', encoding='utf-8') as f:
+        with env_path.open('w', encoding='utf-8') as f:
             f.writelines(lines)
 
+        env_path.chmod(0o600)
         return True
 
     except Exception as e:
-        print(f"更新.env文件失败: {e}")
+        error(f"更新.env文件失败: {e}")
         return False
 
 
-def main():
-    """主函数 - 获取并保存tenant_access_token"""
+def mask_token(token: str, *, prefix: int = 12, suffix: int = 8) -> str:
+    """Return a display-safe token preview."""
+    if len(token) <= prefix + suffix:
+        return "*" * len(token)
+    return f"{token[:prefix]}...{token[-suffix:]}"
+
+
+def main(
+    *,
+    save: bool = False,
+    env_file: str = ".env",
+    print_token: bool = False,
+    app_id: str | None = None,
+    app_secret: str | None = None,
+    base_url: str | None = None,
+    timeout: int = 30,
+) -> bool:
+    """Fetch and optionally persist a tenant access token."""
     panel("Feishu Token", "飞书应用访问令牌获取工具", style="cyan")
 
-    # 检查环境变量
     load_dotenv()
-    app_id = os.getenv('FEISHU_APP_ID')
-    app_secret = os.getenv('FEISHU_APP_SECRET')
+    app_id = app_id or os.getenv('FEISHU_APP_ID')
+    app_secret = app_secret or os.getenv('FEISHU_APP_SECRET')
 
     if not app_id or not app_secret:
-        print("❌ 请先在.env文件中设置FEISHU_APP_ID和FEISHU_APP_SECRET")
-        print("   参考.env.example文件进行配置")
-        return
+        error("请先设置 FEISHU_APP_ID 和 FEISHU_APP_SECRET")
+        return False
 
     print(f"📱 使用应用ID: {app_id}")
     print("🔄 正在获取应用访问令牌...")
 
-    # 获取token
-    result = get_tenant_access_token()
+    result = get_tenant_access_token(app_id=app_id, app_secret=app_secret, base_url=base_url, timeout=timeout)
 
     if result['success']:
         token = result['tenant_access_token']
         expire = result['expire']
 
-        print(f"✅ {result['message']}")
-        print(f"🔐 Token: {token[:20]}...{token[-10:]}")
+        success(result['message'])
+        key_values(
+            "Token",
+            {
+                "preview": mask_token(token),
+                "expires": f"{expire} 秒（约 {expire//3600:.1f} 小时）",
+            },
+            style="green",
+        )
 
-        # 询问是否保存到.env文件
-        save_choice = input("\n是否将token保存到.env文件？(y/n): ").lower().strip()
-
-        if save_choice in ['y', 'yes', '是']:
-            if update_env_file(token):
-                print("✅ 已将tenant_access_token保存到.env文件")
-                print("🚀 现在可以运行 autopaper health 或 autopaper sync 来检查和同步")
-            else:
-                print("❌ 保存到.env文件失败")
-        else:
-            print("ℹ️ 请手动将以下token添加到.env文件：")
+        if print_token:
             print(f"FEISHU_TENANT_ACCESS_TOKEN={token}")
 
-        print(f"\n⏰ 注意：此token有效期为{expire}秒（约{expire//3600:.1f}小时）")
-        print("   过期后需要重新获取")
+        if save:
+            if update_env_file(token, env_file):
+                success(f"已将 tenant_access_token 保存到 {env_file}")
+            else:
+                return False
+        elif not print_token:
+            info("未写入 .env；如需保存请使用 autopaper get-token --save")
+        return True
 
-    else:
-        print(f"❌ {result['message']}")
-        if 'code' in result:
-            print(f"   错误代码: {result['code']}")
-        print("   请检查应用ID和密钥是否正确")
+    error(result['message'])
+    if 'code' in result:
+        print(f"错误代码: {result['code']}")
+    return False
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(0 if main() else 1)

@@ -9,6 +9,7 @@
 #   AUTOPAPER_PROJECT_DIR=/path/to/project
 #   AUTOPAPER_CONFIG_DIR=/path/to/project/conf
 #   AUTOPAPER_SYNC_FLAGS="--limit 10 --no-notify"
+#   AUTOPAPER_CONDA_ENV=autopaper
 #   SYNC_TIMEOUT_SECONDS=7200
 #   ARXIV_REQUEST_TIMEOUT=5,30
 
@@ -23,14 +24,27 @@ LOG_FILE="$LOG_DIR/daily_sync_$(date +%Y%m%d).log"
 mkdir -p "$LOG_DIR"
 
 LOCK_FILE="$LOG_DIR/daily_sync.lock"
-exec 9>"$LOCK_FILE"
-if ! flock -n 9; then
-    {
-        echo "==========================================="
-        echo "⚠️  $(date '+%Y-%m-%d %H:%M:%S %Z') - 已有同步任务在运行，本次跳过"
-        echo "==========================================="
-    } >> "$LOG_FILE"
-    exit 0
+LOCK_DIR="$LOG_DIR/daily_sync.lock.d"
+if command -v flock >/dev/null 2>&1; then
+    exec 9>"$LOCK_FILE"
+    if ! flock -n 9; then
+        {
+            echo "==========================================="
+            echo "⚠️  $(date '+%Y-%m-%d %H:%M:%S %Z') - 已有同步任务在运行，本次跳过"
+            echo "==========================================="
+        } >> "$LOG_FILE"
+        exit 0
+    fi
+else
+    if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+        {
+            echo "==========================================="
+            echo "⚠️  $(date '+%Y-%m-%d %H:%M:%S %Z') - 已有同步任务在运行，本次跳过"
+            echo "==========================================="
+        } >> "$LOG_FILE"
+        exit 0
+    fi
+    trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
 fi
 
 SYNC_TIMEOUT_SECONDS="${SYNC_TIMEOUT_SECONDS:-7200}"
@@ -49,18 +63,22 @@ cd "$PROJECT_DIR" || {
     exit 1
 }
 
-if [ -f "/opt/miniconda3/etc/profile.d/conda.sh" ]; then
-    echo "🐍 初始化conda环境..." >> "$LOG_FILE"
-    source /opt/miniconda3/etc/profile.d/conda.sh
-    conda activate base
-elif [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
-    echo "🐍 初始化conda环境..." >> "$LOG_FILE"
-    source "$HOME/miniconda3/etc/profile.d/conda.sh"
-    conda activate base
-elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
-    echo "🐍 初始化conda环境..." >> "$LOG_FILE"
-    source "$HOME/anaconda3/etc/profile.d/conda.sh"
-    conda activate base
+if [ -n "${AUTOPAPER_CONDA_ENV:-}" ]; then
+    if [ -f "/opt/miniconda3/etc/profile.d/conda.sh" ]; then
+        echo "🐍 激活conda环境: $AUTOPAPER_CONDA_ENV" >> "$LOG_FILE"
+        source /opt/miniconda3/etc/profile.d/conda.sh
+        conda activate "$AUTOPAPER_CONDA_ENV"
+    elif [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+        echo "🐍 激活conda环境: $AUTOPAPER_CONDA_ENV" >> "$LOG_FILE"
+        source "$HOME/miniconda3/etc/profile.d/conda.sh"
+        conda activate "$AUTOPAPER_CONDA_ENV"
+    elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+        echo "🐍 激活conda环境: $AUTOPAPER_CONDA_ENV" >> "$LOG_FILE"
+        source "$HOME/anaconda3/etc/profile.d/conda.sh"
+        conda activate "$AUTOPAPER_CONDA_ENV"
+    else
+        echo "⚠️ 已设置 AUTOPAPER_CONDA_ENV，但未找到 conda 初始化脚本" >> "$LOG_FILE"
+    fi
 fi
 
 if [ -f "venv/bin/activate" ]; then
@@ -104,7 +122,12 @@ fi
 echo "🚀 开始执行论文采集..." >> "$LOG_FILE"
 echo "📝 命令: ${SYNC_CMD[*]}" >> "$LOG_FILE"
 
-timeout --kill-after=60s "$SYNC_TIMEOUT_SECONDS" "${SYNC_CMD[@]}" >> "$LOG_FILE" 2>&1
+if command -v timeout >/dev/null 2>&1; then
+    timeout --kill-after=60s "$SYNC_TIMEOUT_SECONDS" "${SYNC_CMD[@]}" >> "$LOG_FILE" 2>&1
+else
+    echo "⚠️ 未找到 timeout 命令，将不启用总超时控制" >> "$LOG_FILE"
+    "${SYNC_CMD[@]}" >> "$LOG_FILE" 2>&1
+fi
 EXIT_CODE=$?
 
 {

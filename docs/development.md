@@ -13,7 +13,7 @@ uv run pytest
 
 ```bash
 AUTOPAPER_RUN_NETWORK_TESTS=1 \
-AUTOPAPER_ENV_FILE=/home/ubuntu/ws/feishu_paper/.env \
+AUTOPAPER_ENV_FILE=/path/to/project/.env \
 uv run pytest tests/smoke/test_network_smoke.py -q
 ```
 

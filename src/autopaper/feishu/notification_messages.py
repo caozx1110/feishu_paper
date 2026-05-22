@@ -43,7 +43,7 @@ class FeishuMessageBuilderMixin:
                 "tag": "div",
                 "text": {
                     "tag": "lark_md",
-                    "content": f"📊 **本次更新概览**\n新增论文: {total_new} 篇\n数据库总计: {total_papers} 篇\n覆盖领域: {len(update_stats)} 个",
+                    "content": f"📊 **本次更新概览**\n新增论文: {total_new} 篇\n相关表格总计: {total_papers} 篇\n覆盖领域: {len(update_stats)} 个",
                 },
             }
         )
@@ -127,7 +127,7 @@ class FeishuMessageBuilderMixin:
         total_new = sum(stats.get('new_count', 0) for stats in update_stats.values())
         total_papers = sum(stats.get('total_count', 0) for stats in update_stats.values())
 
-        lines.append(f"📊 本次更新: 新增 {total_new} 篇，总计 {total_papers} 篇")
+        lines.append(f"📊 本次更新: 新增 {total_new} 篇，相关表格总计 {total_papers} 篇")
         lines.append(f"🎯 涉及领域: {len(update_stats)} 个")
         lines.append("")
 

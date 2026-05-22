@@ -56,6 +56,9 @@ def test_cli_parser_has_core_commands():
     assert "smoke-search" in help_text
     assert "validate-config" in help_text
     assert "feishu" in help_text
+    token_args = parser.parse_args(["get-token", "--save", "--print-token"])
+    assert token_args.save is True
+    assert token_args.print_token is True
 
 
 def test_package_prints_route_through_rich_terminal():
@@ -84,3 +87,32 @@ def test_cli_init_copies_configs(tmp_path):
     assert (tmp_path / "conf" / "sync_7_vln.yaml").exists()
     assert (tmp_path / ".env.template").exists()
     assert (tmp_path / "scripts" / "daily_arxiv_sync.sh").exists()
+
+
+def test_cli_get_token_saves_to_missing_env_file(monkeypatch, tmp_path):
+    class FakeResponse:
+        def json(self):
+            return {"code": 0, "tenant_access_token": "tenant-token", "expire": 7200}
+
+    def fake_post(url, json, headers, timeout):
+        assert json == {"app_id": "app-id", "app_secret": "app-secret"}
+        return FakeResponse()
+
+    monkeypatch.setattr("autopaper.feishu.tokens.requests.post", fake_post)
+    env_file = tmp_path / ".env"
+
+    exit_code = main(
+        [
+            "get-token",
+            "--env-file",
+            str(env_file),
+            "--app-id",
+            "app-id",
+            "--app-secret",
+            "app-secret",
+            "--save",
+        ]
+    )
+
+    assert exit_code == 0
+    assert "FEISHU_TENANT_ACCESS_TOKEN=tenant-token" in env_file.read_text(encoding="utf-8")

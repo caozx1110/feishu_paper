@@ -32,10 +32,11 @@ show_help() {
     echo "  $0 test         手动执行一次同步脚本"
     echo "  $0 logs         查看最近日志"
     echo ""
-	echo "环境变量:"
-	echo "  AUTOPAPER_CRON_SCHEDULE='0 10 * * *'"
-	echo "  AUTOPAPER_PROJECT_DIR='$PROJECT_DIR'"
-	echo "  AUTOPAPER_SYNC_FLAGS='--limit 10 --no-notify'"
+    echo "环境变量:"
+    echo "  AUTOPAPER_CRON_SCHEDULE='0 10 * * *'"
+    echo "  AUTOPAPER_PROJECT_DIR='$PROJECT_DIR'"
+    echo "  AUTOPAPER_CONDA_ENV='autopaper'"
+    echo "  AUTOPAPER_SYNC_FLAGS='--limit 10 --no-notify'"
 }
 
 check_timezone() {
@@ -51,6 +52,11 @@ check_timezone() {
 
 install_cron() {
     print_info "开始安装 AutoPaper 定时任务..."
+
+    if ! command -v crontab >/dev/null 2>&1; then
+        print_error "未找到 crontab，请先安装 cron 或使用系统调度器手动运行 $DAILY_SYNC_SCRIPT"
+        exit 1
+    fi
 
     if [ ! -f "$DAILY_SYNC_SCRIPT" ]; then
         print_error "执行脚本不存在: $DAILY_SYNC_SCRIPT"
@@ -76,6 +82,10 @@ install_cron() {
 
 uninstall_cron() {
     print_info "开始卸载 AutoPaper 定时任务..."
+    if ! command -v crontab >/dev/null 2>&1; then
+        print_error "未找到 crontab"
+        exit 1
+    fi
     if ! crontab -l 2>/dev/null | grep -q "$CRON_MARKER"; then
         print_warning "未找到 AutoPaper 同步定时任务"
         exit 0
@@ -88,6 +98,11 @@ uninstall_cron() {
 
 show_status() {
     print_info "AutoPaper 定时任务状态"
+    if ! command -v crontab >/dev/null 2>&1; then
+        print_warning "未找到 crontab"
+        check_timezone
+        return
+    fi
     if crontab -l 2>/dev/null | grep -q "$CRON_MARKER"; then
         print_success "定时任务已安装"
         crontab -l 2>/dev/null | grep "$CRON_MARKER"

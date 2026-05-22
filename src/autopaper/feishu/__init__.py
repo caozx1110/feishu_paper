@@ -5,6 +5,7 @@ from .config import FeishuBitableConfig
 from .errors import FeishuBitableAPIError
 from .notifications import ChatNotificationConfig, FeishuChatNotifier, create_chat_notifier_from_config
 from .sync import sync_papers_to_feishu
+from .sync_result import FeishuSyncResult
 from .tokens import get_tenant_access_token, update_env_file
 
 __all__ = [
@@ -13,6 +14,7 @@ __all__ = [
     "FeishuBitableConfig",
     "FeishuBitableConnector",
     "FeishuChatNotifier",
+    "FeishuSyncResult",
     "create_chat_notifier_from_config",
     "get_tenant_access_token",
     "sync_papers_to_feishu",

@@ -113,10 +113,6 @@ class FeishuRecordMixin:
             }
         }
 
-        try:
-            result = self._make_request('POST', endpoint, json=payload)
-            items = result.get('items', [])
-            return len(items) > 0
-        except Exception:
-            # 如果搜索失败，返回False，允许插入
-            return False
+        result = self._make_request('POST', endpoint, json=payload)
+        items = result.get('items', [])
+        return len(items) > 0

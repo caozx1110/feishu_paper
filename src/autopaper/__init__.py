@@ -2,7 +2,7 @@
 
 from .arxiv import ArxivAPI
 from .display import PaperDisplayer
-from .feishu import FeishuBitableConfig, FeishuBitableConnector, sync_papers_to_feishu
+from .feishu import FeishuBitableConfig, FeishuBitableConnector, FeishuSyncResult, sync_papers_to_feishu
 from .ranking import PaperRanker
 
 __version__ = "0.1.0"
@@ -50,6 +50,7 @@ __all__ = [
     "PaperDisplayer",
     "FeishuBitableConnector",
     "FeishuBitableConfig",
+    "FeishuSyncResult",
     "sync_papers_to_feishu",
     "DEFAULT_CONFIG_DIR",
     "get_default_config_dir",

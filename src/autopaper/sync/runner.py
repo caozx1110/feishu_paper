@@ -16,7 +16,7 @@ from ..core import PaperRanker, SearchService, create_arxiv_api
 from ..terminal import debug, print, section, table
 
 try:
-    from ..feishu import create_chat_notifier_from_config, sync_papers_to_feishu
+    from ..feishu import FeishuSyncResult, create_chat_notifier_from_config, sync_papers_to_feishu
 
     FEISHU_AVAILABLE = True
 except ImportError:
@@ -60,17 +60,22 @@ class SyncRunner:
                     dry_run=self.options.dry_run,
                 )
 
-            ranked_papers, synced_count, would_sync_count = self._rank_and_sync(papers, final_cfg)
+            ranked_papers, sync_result, would_sync_count = self._rank_and_sync(papers, final_cfg)
             if ranked_papers is not None:
+                sync_success = True if sync_result is None else sync_result.success
+                sync_errors = [] if sync_result is None else sync_result.errors
                 return self._result(
                     final_cfg,
                     config_name,
-                    success=True,
-                    new_papers=max(synced_count, 0),
+                    success=sync_success,
+                    error="; ".join(sync_errors) if sync_errors and not sync_success else "",
+                    sync_errors=sync_errors,
+                    new_papers=0 if sync_result is None else max(sync_result.synced_count, 0),
                     would_sync=would_sync_count,
                     total_papers=len(ranked_papers),
                     ranked_papers=ranked_papers[:1],
                     dry_run=self.options.dry_run,
+                    sync_result=sync_result,
                 )
 
             return self._result(
@@ -159,12 +164,14 @@ class SyncRunner:
                 traceback.print_exc()
             return False
 
-    def _rank_and_sync(self, papers: list[dict[str, Any]], final_cfg: DictConfig) -> tuple[Optional[list], int, int]:
+    def _rank_and_sync(
+        self, papers: list[dict[str, Any]], final_cfg: DictConfig
+    ) -> tuple[Optional[list], Optional["FeishuSyncResult"], int]:
         interest_keywords, exclude_keywords, raw_interest_keywords, required_keywords_config = load_keywords_from_config(
             final_cfg
         )
         if not interest_keywords and not exclude_keywords:
-            return None, 0, 0
+            return None, None, 0
 
         search_cfg = final_cfg.get("search", {})
         intelligent_cfg = final_cfg.get("intelligent_matching", {})
@@ -184,45 +191,40 @@ class SyncRunner:
         if self.options.limit:
             ranked_papers = ranked_papers[: self.options.limit]
 
-        synced_count = 0
         would_sync_count = self._count_sync_candidates(ranked_papers, final_cfg)
 
         if not ranked_papers:
-            return ranked_papers, synced_count, would_sync_count
+            return ranked_papers, None, would_sync_count
 
         if self.options.dry_run:
             print(f"🧪 dry-run: 已完成搜索和排序，预计 {would_sync_count} 篇论文满足飞书同步阈值，未写入飞书")
             self._print_preview(ranked_papers)
-            return ranked_papers, synced_count, would_sync_count
+            return ranked_papers, None, would_sync_count
 
         if self.options.no_feishu:
             print("ℹ️ 已按 --no-feishu 跳过飞书写入")
-            return ranked_papers, synced_count, would_sync_count
+            return ranked_papers, None, would_sync_count
 
         if not FEISHU_AVAILABLE:
             print("⚠️ 飞书模块不可用，跳过飞书写入")
-            return ranked_papers, synced_count, would_sync_count
+            return ranked_papers, None, would_sync_count
 
         if not final_cfg.get("feishu", {}).get("enabled", False):
             print("ℹ️ 配置中 feishu.enabled=false，跳过飞书写入")
-            return ranked_papers, synced_count, would_sync_count
+            return ranked_papers, None, would_sync_count
 
         os.environ["BATCH_MODE"] = "1"
         try:
             sync_result = sync_papers_to_feishu(ranked_papers, final_cfg)
-            if isinstance(sync_result, int):
-                synced_count = sync_result
-            elif sync_result is True:
-                synced_count = 0
         except Exception as sync_error:
             print(f"⚠️ 同步过程出错: {sync_error}")
             if self.options.verbose:
                 traceback.print_exc()
-            synced_count = 0
+            sync_result = FeishuSyncResult.failed(str(sync_error)) if FEISHU_AVAILABLE else None
         finally:
             os.environ.pop("BATCH_MODE", None)
 
-        return ranked_papers, synced_count, would_sync_count
+        return ranked_papers, sync_result, would_sync_count
 
     def _apply_runtime_overrides(self, final_cfg: DictConfig) -> None:
         if self.options.limit is not None and self.options.limit <= 0:
@@ -285,6 +287,9 @@ class SyncRunner:
         total_papers: int = 0,
         ranked_papers: list | None = None,
         dry_run: bool = False,
+        error: str = "",
+        sync_errors: list[str] | None = None,
+        sync_result: Any = None,
     ) -> dict[str, Any]:
         research_area = final_cfg.get("user_profile", {}).get("research_area", config_name.replace("sync_", ""))
         table_name = final_cfg.get("user_profile", {}).get("name", "").replace("研究员", "").strip() + "论文表"
@@ -298,6 +303,10 @@ class SyncRunner:
             "table_name": table_name,
             "ranked_papers": ranked_papers or [],
             "dry_run": dry_run,
+            "error": error,
+            "sync_errors": sync_errors or [],
+            "sync_result": sync_result,
+            "database_total": _database_total_count(sync_result, fallback=0),
         }
 
 
@@ -365,9 +374,13 @@ def send_batch_summary_notification(
         for result in results:
             if result["success"] and result["new_papers"] > 0:
                 field_name = result["table_name"].replace("论文表", "").strip() or result["research_area"]
+                database_total = _database_total_count(
+                    result.get("sync_result"),
+                    fallback=result.get("database_total", 0),
+                )
                 update_stats[field_name] = {
                     "new_count": result["new_papers"],
-                    "total_count": result["total_papers"],
+                    "total_count": database_total,
                     "table_name": result["table_name"],
                 }
 
@@ -402,3 +415,11 @@ def send_batch_summary_notification(
         print(f"❌ 发送汇总通知失败: {exc}")
         traceback.print_exc()
         return False
+
+
+def _database_total_count(sync_result: Any, *, fallback: int = 0) -> int:
+    if sync_result is None:
+        return fallback
+    total_existing = int(getattr(sync_result, "total_existing", 0) or 0)
+    synced_count = int(getattr(sync_result, "synced_count", 0) or 0)
+    return total_existing + synced_count

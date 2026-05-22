@@ -100,7 +100,13 @@ def build_parser() -> argparse.ArgumentParser:
             subparser.add_argument("--send", action="store_true", help="send a real test notification")
             subparser.add_argument("--all-chats", action="store_true", help="with --send, send to every bot chat")
 
-    subparsers.add_parser("get-token", parents=[common_parent], help="fetch a Feishu tenant_access_token")
+    token_parser = subparsers.add_parser("get-token", parents=[common_parent], help="fetch a Feishu tenant_access_token")
+    token_parser.add_argument("--save", action="store_true", help="save token to the selected env file")
+    token_parser.add_argument("--print-token", action="store_true", help="print the full token for shell capture")
+    token_parser.add_argument("--app-id", help="override FEISHU_APP_ID")
+    token_parser.add_argument("--app-secret", help="override FEISHU_APP_SECRET")
+    token_parser.add_argument("--base-url", help="override Feishu API base URL")
+    token_parser.add_argument("--timeout", type=int, default=30, help="request timeout in seconds")
     return parser
 
 
@@ -362,18 +368,27 @@ def cmd_feishu(args: argparse.Namespace) -> int:
     return 1
 
 
-def cmd_get_token(_: argparse.Namespace) -> int:
+def cmd_get_token(args: argparse.Namespace) -> int:
     from ..feishu.tokens import main as get_token_main
 
-    get_token_main()
-    return 0
+    env_file = getattr(args, "env_file", None) or os.getenv("AUTOPAPER_ENV_FILE") or ".env"
+    ok = get_token_main(
+        save=args.save,
+        env_file=env_file,
+        print_token=args.print_token,
+        app_id=args.app_id,
+        app_secret=args.app_secret,
+        base_url=args.base_url,
+        timeout=args.timeout,
+    )
+    return 0 if ok else 1
 
 
 def main(argv: Optional[list[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     set_output_mode(verbose=getattr(args, "verbose", False), quiet=getattr(args, "quiet", False))
-    env_status = _load_env(args.env_file)
+    env_status = _load_env(args.env_file, allow_missing=args.command == "get-token")
     if env_status is False:
         return 1
     if args.command is None:
@@ -418,11 +433,13 @@ def _validate_named_configs(config_name: str, config_dir: Optional[str]) -> list
     return results
 
 
-def _load_env(env_file: Optional[str]) -> bool:
+def _load_env(env_file: Optional[str], *, allow_missing: bool = False) -> bool:
     requested_env_file = env_file or os.getenv("AUTOPAPER_ENV_FILE")
     if requested_env_file:
         path = Path(requested_env_file).expanduser()
         if not path.exists():
+            if allow_missing:
+                return True
             error(f"env file not found: {path}")
             return False
         load_dotenv(path, override=True)

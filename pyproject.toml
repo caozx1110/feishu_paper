@@ -7,17 +7,17 @@ name = "autopaper"
 version = "0.1.0"
 description = "Collect, rank, and sync arXiv papers to Feishu Bitable."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "AutoPaper contributors" }]
+maintainers = [{ name = "AutoPaper contributors" }]
 keywords = ["arxiv", "feishu", "papers", "research", "automation"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -26,9 +26,7 @@ classifiers = [
 ]
 dependencies = [
     "arxiv>=2.1.0",
-    "feedparser>=6.0.0",
     "hydra-core>=1.3.0",
-    "lark-oapi>=1.0.0",
     "omegaconf>=2.2.0",
     "python-dotenv>=1.0.0",
     "PyYAML>=5.4.0",
@@ -36,6 +34,12 @@ dependencies = [
     "requests>=2.25.0",
     "rich>=13.7.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/caozx1110/feishu_paper"
+Documentation = "https://github.com/caozx1110/feishu_paper#readme"
+Issues = "https://github.com/caozx1110/feishu_paper/issues"
+Source = "https://github.com/caozx1110/feishu_paper"
 
 [project.optional-dependencies]
 dev = [
@@ -63,7 +67,7 @@ autopaper = "autopaper.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-autopaper = ["config/*.yaml", "scripts/*", "templates/*"]
+autopaper = ["config/*.yaml", "scripts/*", "templates/*", "py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -74,4 +78,4 @@ markers = [
 
 [tool.ruff]
 line-length = 120
-target-version = "py39"
+target-version = "py310"

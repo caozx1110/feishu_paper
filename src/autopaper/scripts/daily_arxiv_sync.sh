@@ -10,6 +10,7 @@
 #   AUTOPAPER_CONFIG_DIR=/path/to/project/conf
 #   AUTOPAPER_SYNC_FLAGS="--limit 10 --no-notify"
 #   AUTOPAPER_CONDA_ENV=autopaper
+#   AUTOPAPER_BIN=/path/to/autopaper
 #   SYNC_TIMEOUT_SECONDS=7200
 #   ARXIV_REQUEST_TIMEOUT=5,30
 
@@ -89,18 +90,21 @@ elif [ -f ".venv/bin/activate" ]; then
     source .venv/bin/activate
 fi
 
-if ! command -v python3 >/dev/null 2>&1; then
-    echo "❌ Python3 未找到" >> "$LOG_FILE"
+AUTOPAPER_BIN="${AUTOPAPER_BIN:-autopaper}"
+AUTOPAPER_CMD=("$AUTOPAPER_BIN")
+
+if ! command -v "$AUTOPAPER_BIN" >/dev/null 2>&1; then
+    echo "❌ autopaper 命令不可用，请先安装 CLI，或设置 AUTOPAPER_BIN=/path/to/autopaper" >> "$LOG_FILE"
     exit 1
 fi
 
-if ! python3 -m autopaper --version >> "$LOG_FILE" 2>&1; then
-    echo "❌ autopaper 包不可用，请先运行: pip install -e /path/to/autopaper" >> "$LOG_FILE"
+if ! "${AUTOPAPER_CMD[@]}" --version >> "$LOG_FILE" 2>&1; then
+    echo "❌ autopaper 命令不可用: ${AUTOPAPER_CMD[*]}" >> "$LOG_FILE"
     exit 1
 fi
 
 echo "🌐 检查AutoPaper运行环境..." >> "$LOG_FILE"
-HEALTH_CMD=(python3 -m autopaper health --config all)
+HEALTH_CMD=("${AUTOPAPER_CMD[@]}" health --config all)
 if [ -f "$CONFIG_DIR/default.yaml" ]; then
     HEALTH_CMD+=(--config-dir "$CONFIG_DIR")
 fi
@@ -109,7 +113,7 @@ if ! "${HEALTH_CMD[@]}" >> "$LOG_FILE" 2>&1; then
     exit 1
 fi
 
-SYNC_CMD=(python3 -m autopaper sync --config all)
+SYNC_CMD=("${AUTOPAPER_CMD[@]}" sync --config all)
 if [ -f "$CONFIG_DIR/all.yaml" ]; then
     SYNC_CMD+=(--config-dir "$CONFIG_DIR")
 fi

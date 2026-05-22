@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Install, remove, and inspect the AutoPaper daily cron job.
+# Manage the AutoPaper daily cron job.
 
 set -u
 
@@ -9,7 +9,6 @@ PROJECT_DIR="${AUTOPAPER_PROJECT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 DAILY_SYNC_SCRIPT="${AUTOPAPER_DAILY_SYNC_SCRIPT:-$SCRIPT_DIR/daily_arxiv_sync.sh}"
 CRON_SCHEDULE="${AUTOPAPER_CRON_SCHEDULE:-0 10 * * *}"
 CRON_MARKER="autopaper daily_arxiv_sync"
-CRON_LINE="$CRON_SCHEDULE AUTOPAPER_PROJECT_DIR=\"$PROJECT_DIR\" \"$DAILY_SYNC_SCRIPT\" # $CRON_MARKER"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -22,21 +21,167 @@ print_success() { echo -e "${GREEN}✅ $1${NC}"; }
 print_warning() { echo -e "${YELLOW}⚠️  $1${NC}"; }
 print_error() { echo -e "${RED}❌ $1${NC}"; }
 
+escape_cron_value() {
+    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+cron_env_pair() {
+    local name="$1"
+    local value="$2"
+    printf '%s="%s"' "$name" "$(escape_cron_value "$value")"
+}
+
+build_cron_env() {
+    local entries=()
+    entries+=("$(cron_env_pair AUTOPAPER_PROJECT_DIR "$PROJECT_DIR")")
+
+    if [ -n "${AUTOPAPER_CONFIG_DIR:-}" ]; then
+        entries+=("$(cron_env_pair AUTOPAPER_CONFIG_DIR "$AUTOPAPER_CONFIG_DIR")")
+    fi
+    if [ -n "${AUTOPAPER_LOG_DIR:-}" ]; then
+        entries+=("$(cron_env_pair AUTOPAPER_LOG_DIR "$AUTOPAPER_LOG_DIR")")
+    fi
+    if [ -n "${AUTOPAPER_SYNC_FLAGS:-}" ]; then
+        entries+=("$(cron_env_pair AUTOPAPER_SYNC_FLAGS "$AUTOPAPER_SYNC_FLAGS")")
+    fi
+    if [ -n "${AUTOPAPER_CONDA_ENV:-}" ]; then
+        entries+=("$(cron_env_pair AUTOPAPER_CONDA_ENV "$AUTOPAPER_CONDA_ENV")")
+    fi
+    if [ -n "${AUTOPAPER_BIN:-}" ]; then
+        entries+=("$(cron_env_pair AUTOPAPER_BIN "$AUTOPAPER_BIN")")
+    fi
+    if [ -n "${SYNC_TIMEOUT_SECONDS:-}" ]; then
+        entries+=("$(cron_env_pair SYNC_TIMEOUT_SECONDS "$SYNC_TIMEOUT_SECONDS")")
+    fi
+    if [ -n "${ARXIV_REQUEST_TIMEOUT:-}" ]; then
+        entries+=("$(cron_env_pair ARXIV_REQUEST_TIMEOUT "$ARXIV_REQUEST_TIMEOUT")")
+    fi
+
+    local IFS=' '
+    echo "${entries[*]}"
+}
+
+cron_line() {
+    echo "$CRON_SCHEDULE $(build_cron_env) \"$(escape_cron_value "$DAILY_SYNC_SCRIPT")\" # $CRON_MARKER"
+}
+
 show_help() {
     echo "AutoPaper 定时任务管理脚本"
     echo ""
     echo "使用方法:"
-    echo "  $0 install      安装每日同步任务"
-    echo "  $0 uninstall    卸载同步任务"
-    echo "  $0 status       查看同步任务状态"
-    echo "  $0 test         手动执行一次同步脚本"
-    echo "  $0 logs         查看最近日志"
+    echo "  $0 add       新增定时同步任务；已存在时不会覆盖"
+    echo "  $0 delete    删除当前 AutoPaper 定时同步任务"
+    echo "  $0 update    更新已存在任务的时间、脚本路径和环境变量"
+    echo "  $0 status    查看当前任务状态"
+    echo "  $0 test      手动执行一次同步脚本"
+    echo "  $0 logs      查看最近日志"
     echo ""
-    echo "环境变量:"
+    echo "常用环境变量:"
     echo "  AUTOPAPER_CRON_SCHEDULE='0 10 * * *'"
     echo "  AUTOPAPER_PROJECT_DIR='$PROJECT_DIR'"
-    echo "  AUTOPAPER_CONDA_ENV='autopaper'"
+    echo "  AUTOPAPER_DAILY_SYNC_SCRIPT='$DAILY_SYNC_SCRIPT'"
+    echo "  AUTOPAPER_BIN='/path/to/autopaper'"
     echo "  AUTOPAPER_SYNC_FLAGS='--limit 10 --no-notify'"
+    echo "  AUTOPAPER_CONDA_ENV='autopaper'"
+    echo "  SYNC_TIMEOUT_SECONDS=7200"
+    echo ""
+    echo "当前将写入的 cron:"
+    echo "  $(cron_line)"
+}
+
+ensure_crontab() {
+    if ! command -v crontab >/dev/null 2>&1; then
+        print_error "未找到 crontab，请先安装 cron，或使用系统调度器手动运行 $DAILY_SYNC_SCRIPT"
+        exit 1
+    fi
+}
+
+ensure_sync_script() {
+    if [ ! -f "$DAILY_SYNC_SCRIPT" ]; then
+        print_error "执行脚本不存在: $DAILY_SYNC_SCRIPT"
+        exit 1
+    fi
+
+    if [ ! -x "$DAILY_SYNC_SCRIPT" ]; then
+        chmod +x "$DAILY_SYNC_SCRIPT"
+    fi
+}
+
+backup_crontab() {
+    crontab -l > "/tmp/autopaper_crontab_backup_$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
+}
+
+current_crontab() {
+    crontab -l 2>/dev/null || true
+}
+
+job_exists() {
+    current_crontab | grep -q "$CRON_MARKER"
+}
+
+write_crontab_without_job() {
+    current_crontab | grep -v "$CRON_MARKER" | crontab -
+}
+
+add_cron() {
+    print_info "新增 AutoPaper 定时任务..."
+    ensure_crontab
+    ensure_sync_script
+
+    if job_exists; then
+        print_warning "定时任务已存在；如需修改请运行: $0 update"
+        show_status
+        exit 1
+    fi
+
+    backup_crontab
+    local new_cron_line
+    new_cron_line="$(cron_line)"
+    if ! (current_crontab; echo "$new_cron_line") | crontab -; then
+        print_error "定时任务新增失败"
+        exit 1
+    fi
+    print_success "定时任务新增成功"
+    print_info "任务: $new_cron_line"
+    print_info "日志目录: $PROJECT_DIR/logs"
+}
+
+delete_cron() {
+    print_info "删除 AutoPaper 定时任务..."
+    ensure_crontab
+
+    if ! job_exists; then
+        print_warning "未找到 AutoPaper 定时任务"
+        exit 0
+    fi
+
+    backup_crontab
+    if ! write_crontab_without_job; then
+        print_error "定时任务删除失败"
+        exit 1
+    fi
+    print_success "定时任务删除成功"
+}
+
+update_cron() {
+    print_info "更新 AutoPaper 定时任务..."
+    ensure_crontab
+    ensure_sync_script
+
+    if ! job_exists; then
+        print_error "未找到可更新的 AutoPaper 定时任务；请先运行: $0 add"
+        exit 1
+    fi
+
+    backup_crontab
+    local new_cron_line
+    new_cron_line="$(cron_line)"
+    if ! (current_crontab | grep -v "$CRON_MARKER"; echo "$new_cron_line") | crontab -; then
+        print_error "定时任务更新失败"
+        exit 1
+    fi
+    print_success "定时任务更新成功"
+    print_info "任务: $new_cron_line"
 }
 
 check_timezone() {
@@ -50,52 +195,6 @@ check_timezone() {
     fi
 }
 
-install_cron() {
-    print_info "开始安装 AutoPaper 定时任务..."
-
-    if ! command -v crontab >/dev/null 2>&1; then
-        print_error "未找到 crontab，请先安装 cron 或使用系统调度器手动运行 $DAILY_SYNC_SCRIPT"
-        exit 1
-    fi
-
-    if [ ! -f "$DAILY_SYNC_SCRIPT" ]; then
-        print_error "执行脚本不存在: $DAILY_SYNC_SCRIPT"
-        exit 1
-    fi
-
-    if [ ! -x "$DAILY_SYNC_SCRIPT" ]; then
-        chmod +x "$DAILY_SYNC_SCRIPT"
-    fi
-
-    crontab -l > "/tmp/autopaper_crontab_backup_$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
-    (crontab -l 2>/dev/null | grep -v "$CRON_MARKER"; echo "$CRON_LINE") | crontab -
-
-    if [ $? -eq 0 ]; then
-        print_success "定时任务安装成功"
-        print_info "任务: $CRON_LINE"
-        print_info "日志目录: $PROJECT_DIR/logs"
-    else
-        print_error "定时任务安装失败"
-        exit 1
-    fi
-}
-
-uninstall_cron() {
-    print_info "开始卸载 AutoPaper 定时任务..."
-    if ! command -v crontab >/dev/null 2>&1; then
-        print_error "未找到 crontab"
-        exit 1
-    fi
-    if ! crontab -l 2>/dev/null | grep -q "$CRON_MARKER"; then
-        print_warning "未找到 AutoPaper 同步定时任务"
-        exit 0
-    fi
-
-    crontab -l > "/tmp/autopaper_crontab_backup_$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
-    crontab -l 2>/dev/null | grep -v "$CRON_MARKER" | crontab -
-    print_success "定时任务卸载成功"
-}
-
 show_status() {
     print_info "AutoPaper 定时任务状态"
     if ! command -v crontab >/dev/null 2>&1; then
@@ -103,17 +202,23 @@ show_status() {
         check_timezone
         return
     fi
-    if crontab -l 2>/dev/null | grep -q "$CRON_MARKER"; then
+
+    if job_exists; then
         print_success "定时任务已安装"
-        crontab -l 2>/dev/null | grep "$CRON_MARKER"
+        current_crontab | grep "$CRON_MARKER"
     else
         print_warning "定时任务未安装"
     fi
+
+    echo ""
+    print_info "当前配置生成的任务:"
+    cron_line
     echo ""
     check_timezone
 }
 
 test_script() {
+    ensure_sync_script
     print_info "手动执行同步脚本..."
     "$DAILY_SYNC_SCRIPT"
 }
@@ -136,8 +241,9 @@ show_logs() {
 }
 
 case "${1:-help}" in
-    install) install_cron ;;
-    uninstall) uninstall_cron ;;
+    add) add_cron ;;
+    delete) delete_cron ;;
+    update) update_cron ;;
     status) show_status ;;
     test) test_script ;;
     logs) show_logs ;;

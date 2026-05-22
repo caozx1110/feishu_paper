@@ -165,14 +165,14 @@ autopaper --env-file .env sync --config all --config-dir ./conf
 
 ```bash
 chmod +x scripts/*.sh
-scripts/setup_daily_sync.sh install
+scripts/setup_daily_sync.sh add
 scripts/setup_daily_sync.sh status
 ```
 
 默认每天按 `AUTOPAPER_CRON_SCHEDULE` 执行，默认值为 `0 10 * * *`。可通过环境变量调整：
 
 ```bash
-AUTOPAPER_CRON_SCHEDULE="0 9 * * *" scripts/setup_daily_sync.sh install
+AUTOPAPER_CRON_SCHEDULE="0 9 * * *" scripts/setup_daily_sync.sh add
 ```
 
 定时任务默认执行：

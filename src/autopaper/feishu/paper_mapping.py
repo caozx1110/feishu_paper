@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+from .dates import to_feishu_timestamp_millis
+
 
 class FeishuPaperMappingMixin:
     def format_paper_data(self, paper_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -20,14 +22,9 @@ class FeishuPaperMappingMixin:
         for key, value in paper_data.items():
             if key in ["发布日期", "更新日期"] and value:
                 # 日期字段需要时间戳（毫秒）
-                if isinstance(value, str):
-                    try:
-                        from datetime import datetime
-
-                        dt = datetime.strptime(value, "%Y-%m-%d")
-                        formatted_data[key] = int(dt.timestamp() * 1000)
-                    except ValueError:
-                        formatted_data[key] = value
+                timestamp = to_feishu_timestamp_millis(value)
+                if timestamp is not None:
+                    formatted_data[key] = timestamp
                 else:
                     formatted_data[key] = value
 

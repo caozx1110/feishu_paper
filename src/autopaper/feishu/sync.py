@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
 from typing import Any
 
 from dotenv import load_dotenv
@@ -11,6 +10,7 @@ from dotenv import load_dotenv
 from ..terminal import debug, error, info, key_values, print, success, table, warning
 from .bitable import FeishuBitableConnector
 from .config import FeishuBitableConfig
+from .dates import to_feishu_timestamp_millis
 from .sync_result import FeishuSyncResult
 
 
@@ -456,8 +456,4 @@ def _string_list(value, *, limit: int | None = None) -> list[str]:
 
 
 def _timestamp_millis(value) -> int | None:
-    if value is None:
-        return None
-    if isinstance(value, datetime):
-        return int(value.timestamp() * 1000)
-    return None
+    return to_feishu_timestamp_millis(value)

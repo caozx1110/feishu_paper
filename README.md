@@ -49,7 +49,6 @@ autopaper --help
 mkdir my-autopaper
 cd my-autopaper
 autopaper init --with-scripts
-cp .env.template .env
 ```
 
 生成后的主要文件：
@@ -60,6 +59,7 @@ cp .env.template .env
 | `conf/default.yaml`           | 通用默认配置。                             |
 | `conf/all.yaml`               | 批量同步和飞书汇总通知配置。               |
 | `conf/sync_*.yaml`            | 每个研究方向的搜索、关键词和同步配置。     |
+| `scripts/configure_project.sh` | 交互式一键配置脚本。                       |
 | `scripts/setup_daily_sync.sh` | 定时任务安装和管理脚本。                   |
 | `scripts/daily_arxiv_sync.sh` | 每日同步执行脚本。                         |
 
@@ -69,7 +69,27 @@ cp .env.template .env
 uv run autopaper init --target my-autopaper --with-scripts
 ```
 
-### 2. 配置飞书环境变量
+### 2. 一键交互配置
+
+推荐直接运行配置向导：
+
+```bash
+chmod +x scripts/*.sh
+scripts/configure_project.sh
+```
+
+向导会依次完成：
+
+| 步骤             | 内容                                                                 |
+| ---------------- | -------------------------------------------------------------------- |
+| 环境配置         | 创建或更新 `.env`，提示填写飞书 App ID、App Secret、表格 token 等。 |
+| 飞书通知配置     | 更新 `conf/all.yaml`，设置群通知开关、群聊 ID、通知阈值和推荐数量。  |
+| 配置检查         | 运行配置校验、健康检查，可选择检查或发送飞书测试通知。               |
+| 定时任务配置     | 配置每日同步 cron；已有任务会更新，没有任务会新增。                  |
+
+### 3. 手动配置飞书环境变量（可选）
+
+如果已经运行 `scripts/configure_project.sh`，可以跳过本节和下一节。
 
 编辑 `.env`：
 
@@ -86,7 +106,7 @@ FEISHU_TENANT_ACCESS_TOKEN=t-xxx
 autopaper get-token --env-file .env --save
 ```
 
-### 3. 配置飞书群通知
+### 4. 手动配置飞书群通知（可选）
 
 编辑 `conf/all.yaml`，开启批量汇总通知：
 
@@ -122,7 +142,7 @@ target_chat_ids: []
 | 达到 `min_papers_threshold` | 新增数量小于阈值时不会通知。                               |
 | 未使用跳过参数                | 不要加 `--dry-run`、`--no-feishu` 或 `--no-notify`。 |
 
-### 4. 检查配置和飞书连通性
+### 5. 检查配置和飞书连通性
 
 ```bash
 autopaper --env-file .env validate-config --config all --config-dir ./conf
@@ -130,7 +150,7 @@ autopaper --env-file .env health --config all --config-dir ./conf --skip-network
 autopaper --env-file .env feishu check --config sync_1_llm_robotics --config-dir ./conf
 ```
 
-### 5. 先小范围试运行
+### 6. 先小范围试运行
 
 先确认搜索、排序和飞书写入链路。`--limit 2` 会限制本次处理数量，`--no-notify` 避免测试时发送正式汇总通知：
 
@@ -144,7 +164,7 @@ autopaper --env-file .env sync --config sync_1_llm_robotics --config-dir ./conf 
 autopaper --env-file .env sync --config all --config-dir ./conf --dry-run --limit 2
 ```
 
-### 6. 完整同步并发送飞书通知
+### 7. 完整同步并发送飞书通知
 
 确认配置无误后，执行完整同步：
 
@@ -161,7 +181,9 @@ autopaper --env-file .env sync --config all --config-dir ./conf
 | 写入飞书多维表格          | 新论文写入对应研究方向表格。                   |
 | 发送飞书汇总通知          | 有新增论文且达到阈值时，向配置的群聊发送消息。 |
 
-### 7. 开启每日自动同步
+### 8. 开启每日自动同步
+
+配置向导已经可以新增或更新定时任务；也可以单独运行：
 
 ```bash
 chmod +x scripts/*.sh
@@ -193,6 +215,7 @@ logs/daily_sync_YYYYMMDD.log
 
 | 命令                                                                                      | 用途                           |
 | ----------------------------------------------------------------------------------------- | ------------------------------ |
+| `scripts/configure_project.sh`                                                          | 交互式配置 `.env`、通知和定时任务。 |
 | `autopaper list-configs --config-dir ./conf`                                            | 查看所有同步配置。             |
 | `autopaper validate-config --config all --config-dir ./conf`                            | 校验全部配置。                 |
 | `autopaper health --config all --config-dir ./conf --skip-network`                      | 检查包、配置和飞书环境变量。   |

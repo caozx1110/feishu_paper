@@ -140,10 +140,9 @@ def cmd_init(args: argparse.Namespace) -> int:
     bullet_list(
         "Next Steps",
         [
-            "cp .env.template .env && edit .env",
-            "autopaper health --config-dir ./conf --skip-network",
-            "autopaper smoke-search --config-dir ./conf --max-results 1",
-            "autopaper sync --config sync_7_vln --config-dir ./conf --dry-run --limit 2",
+            "scripts/configure_project.sh",
+            "autopaper sync --config all --config-dir ./conf",
+            "scripts/setup_daily_sync.sh status",
         ],
         style="green",
     )

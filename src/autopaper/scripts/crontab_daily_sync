@@ -4,4 +4,4 @@
 #   scripts/setup_daily_sync.sh add
 #
 # Manual template:
-#   0 10 * * * AUTOPAPER_PROJECT_DIR="/path/to/your/project" "/path/to/your/project/scripts/daily_arxiv_sync.sh" # autopaper daily_arxiv_sync
+#   0 10 * * * AUTOPAPER_PROJECT_DIR="/path/to/your/project" AUTOPAPER_UV_BIN="/path/to/uv" AUTOPAPER_UV_PROJECT_DIR="/path/to/autopaper/source-or-project" "/path/to/your/project/scripts/daily_arxiv_sync.sh" # autopaper daily_arxiv_sync

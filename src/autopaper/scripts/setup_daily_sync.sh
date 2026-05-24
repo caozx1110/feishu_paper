@@ -25,6 +25,45 @@ escape_cron_value() {
     printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
+resolve_uv_bin() {
+    if [ -n "${AUTOPAPER_UV_BIN:-}" ]; then
+        if [ -x "$AUTOPAPER_UV_BIN" ] || command -v "$AUTOPAPER_UV_BIN" >/dev/null 2>&1; then
+            printf '%s\n' "$AUTOPAPER_UV_BIN"
+            return 0
+        fi
+        return 1
+    fi
+
+    if command -v uv >/dev/null 2>&1; then
+        command -v uv
+        return 0
+    fi
+
+    if [ -x "$HOME/.local/bin/uv" ]; then
+        printf '%s\n' "$HOME/.local/bin/uv"
+        return 0
+    fi
+
+    return 1
+}
+
+discover_uv_project_dir() {
+    if [ -n "${AUTOPAPER_UV_PROJECT_DIR:-}" ]; then
+        printf '%s\n' "$AUTOPAPER_UV_PROJECT_DIR"
+        return 0
+    fi
+
+    local candidate
+    for candidate in "$PROJECT_DIR" "$PROJECT_DIR/.." "$SCRIPT_DIR/../../.."; do
+        if [ -f "$candidate/pyproject.toml" ]; then
+            (cd "$candidate" >/dev/null 2>&1 && pwd)
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 cron_env_pair() {
     local name="$1"
     local value="$2"
@@ -47,8 +86,23 @@ build_cron_env() {
     if [ -n "${AUTOPAPER_CONDA_ENV:-}" ]; then
         entries+=("$(cron_env_pair AUTOPAPER_CONDA_ENV "$AUTOPAPER_CONDA_ENV")")
     fi
-    if [ -n "${AUTOPAPER_BIN:-}" ]; then
-        entries+=("$(cron_env_pair AUTOPAPER_BIN "$AUTOPAPER_BIN")")
+    local uv_bin
+    uv_bin="${AUTOPAPER_UV_BIN:-$(resolve_uv_bin || true)}"
+    if [ -n "$uv_bin" ]; then
+        entries+=("$(cron_env_pair AUTOPAPER_UV_BIN "$uv_bin")")
+    fi
+    local uv_project_dir
+    uv_project_dir="${AUTOPAPER_UV_PROJECT_DIR:-$(discover_uv_project_dir || true)}"
+    if [ -n "$uv_project_dir" ]; then
+        entries+=("$(cron_env_pair AUTOPAPER_UV_PROJECT_DIR "$uv_project_dir")")
+    fi
+    local env_file
+    env_file="${AUTOPAPER_ENV_FILE:-$PROJECT_DIR/.env}"
+    if [ -f "$env_file" ] || [ -n "${AUTOPAPER_ENV_FILE:-}" ]; then
+        entries+=("$(cron_env_pair AUTOPAPER_ENV_FILE "$env_file")")
+    fi
+    if [ -n "${AUTOPAPER_CLI:-}" ]; then
+        entries+=("$(cron_env_pair AUTOPAPER_CLI "$AUTOPAPER_CLI")")
     fi
     if [ -n "${SYNC_TIMEOUT_SECONDS:-}" ]; then
         entries+=("$(cron_env_pair SYNC_TIMEOUT_SECONDS "$SYNC_TIMEOUT_SECONDS")")
@@ -80,7 +134,10 @@ show_help() {
     echo "  AUTOPAPER_CRON_SCHEDULE='0 10 * * *'"
     echo "  AUTOPAPER_PROJECT_DIR='$PROJECT_DIR'"
     echo "  AUTOPAPER_DAILY_SYNC_SCRIPT='$DAILY_SYNC_SCRIPT'"
-    echo "  AUTOPAPER_BIN='/path/to/autopaper'"
+    echo "  AUTOPAPER_UV_BIN='/path/to/uv'"
+    echo "  AUTOPAPER_UV_PROJECT_DIR='/path/to/autopaper/source-or-project'"
+    echo "  AUTOPAPER_ENV_FILE='$PROJECT_DIR/.env'"
+    echo "  AUTOPAPER_CLI='autopaper'"
     echo "  AUTOPAPER_SYNC_FLAGS='--limit 10 --no-notify'"
     echo "  AUTOPAPER_CONDA_ENV='autopaper'"
     echo "  SYNC_TIMEOUT_SECONDS=7200"

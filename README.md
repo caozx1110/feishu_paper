@@ -178,8 +178,10 @@ AUTOPAPER_CRON_SCHEDULE="0 9 * * *" scripts/setup_daily_sync.sh add
 定时任务默认执行：
 
 ```bash
-autopaper sync --config all
+uv run autopaper --env-file .env sync --config all --config-dir ./conf
 ```
+
+`setup_daily_sync.sh` 会把 `uv` 路径、源码项目目录和 `.env` 路径写入 cron；如需手动指定，可设置 `AUTOPAPER_UV_BIN`、`AUTOPAPER_UV_PROJECT_DIR` 或 `AUTOPAPER_ENV_FILE`。
 
 因此，只要 `conf/all.yaml` 中开启 `feishu.chat_notification.enabled: true`，每天有新增论文时就会自动发送飞书通知。日志在：
 

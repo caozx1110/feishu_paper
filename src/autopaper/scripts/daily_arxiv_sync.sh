@@ -8,9 +8,12 @@
 # Environment overrides:
 #   AUTOPAPER_PROJECT_DIR=/path/to/project
 #   AUTOPAPER_CONFIG_DIR=/path/to/project/conf
+#   AUTOPAPER_ENV_FILE=/path/to/project/.env
+#   AUTOPAPER_UV_BIN=/path/to/uv
+#   AUTOPAPER_UV_PROJECT_DIR=/path/to/autopaper/source-or-project
+#   AUTOPAPER_CLI=autopaper
 #   AUTOPAPER_SYNC_FLAGS="--limit 10 --no-notify"
 #   AUTOPAPER_CONDA_ENV=autopaper
-#   AUTOPAPER_BIN=/path/to/autopaper
 #   SYNC_TIMEOUT_SECONDS=7200
 #   ARXIV_REQUEST_TIMEOUT=5,30
 
@@ -82,24 +85,66 @@ if [ -n "${AUTOPAPER_CONDA_ENV:-}" ]; then
     fi
 fi
 
-if [ -f "venv/bin/activate" ]; then
-    echo "🐍 激活Python虚拟环境..." >> "$LOG_FILE"
-    source venv/bin/activate
-elif [ -f ".venv/bin/activate" ]; then
-    echo "🐍 激活Python虚拟环境..." >> "$LOG_FILE"
-    source .venv/bin/activate
-fi
+resolve_uv_bin() {
+    if [ -n "${AUTOPAPER_UV_BIN:-}" ]; then
+        if [ -x "$AUTOPAPER_UV_BIN" ] || command -v "$AUTOPAPER_UV_BIN" >/dev/null 2>&1; then
+            printf '%s\n' "$AUTOPAPER_UV_BIN"
+            return 0
+        fi
+        return 1
+    fi
 
-AUTOPAPER_BIN="${AUTOPAPER_BIN:-autopaper}"
-AUTOPAPER_CMD=("$AUTOPAPER_BIN")
+    if command -v uv >/dev/null 2>&1; then
+        command -v uv
+        return 0
+    fi
 
-if ! command -v "$AUTOPAPER_BIN" >/dev/null 2>&1; then
-    echo "❌ autopaper 命令不可用，请先安装 CLI，或设置 AUTOPAPER_BIN=/path/to/autopaper" >> "$LOG_FILE"
+    if [ -x "$HOME/.local/bin/uv" ]; then
+        printf '%s\n' "$HOME/.local/bin/uv"
+        return 0
+    fi
+
+    return 1
+}
+
+discover_uv_project_dir() {
+    if [ -n "${AUTOPAPER_UV_PROJECT_DIR:-}" ]; then
+        printf '%s\n' "$AUTOPAPER_UV_PROJECT_DIR"
+        return 0
+    fi
+
+    local candidate
+    for candidate in "$PROJECT_DIR" "$PROJECT_DIR/.." "$SCRIPT_DIR/../../.."; do
+        if [ -f "$candidate/pyproject.toml" ]; then
+            (cd "$candidate" >/dev/null 2>&1 && pwd)
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+if ! UV_BIN="$(resolve_uv_bin)"; then
+    echo "❌ uv 命令不可用，请先安装 uv，或设置 AUTOPAPER_UV_BIN=/path/to/uv" >> "$LOG_FILE"
     exit 1
 fi
 
+AUTOPAPER_CLI="${AUTOPAPER_CLI:-autopaper}"
+ENV_FILE="${AUTOPAPER_ENV_FILE:-$PROJECT_DIR/.env}"
+AUTOPAPER_CMD=("$UV_BIN")
+if UV_PROJECT_DIR="$(discover_uv_project_dir)"; then
+    AUTOPAPER_CMD+=(--directory "$UV_PROJECT_DIR")
+    echo "🐍 使用 uv 项目目录: $UV_PROJECT_DIR" >> "$LOG_FILE"
+else
+    echo "🐍 未发现 pyproject.toml，将直接使用 uv run" >> "$LOG_FILE"
+fi
+AUTOPAPER_CMD+=(run "$AUTOPAPER_CLI")
+if [ -f "$ENV_FILE" ] || [ -n "${AUTOPAPER_ENV_FILE:-}" ]; then
+    AUTOPAPER_CMD+=(--env-file "$ENV_FILE")
+fi
+
 if ! "${AUTOPAPER_CMD[@]}" --version >> "$LOG_FILE" 2>&1; then
-    echo "❌ autopaper 命令不可用: ${AUTOPAPER_CMD[*]}" >> "$LOG_FILE"
+    echo "❌ AutoPaper CLI 不可用: ${AUTOPAPER_CMD[*]}" >> "$LOG_FILE"
     exit 1
 fi
 
